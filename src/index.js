@@ -207,6 +207,36 @@ if (isInBrowser) {
             color: var(--ls-primary-text-color);
           }
           .lsp-mdtable-renderer .lsp-mdtable-fullscreen { margin-left: 6px; }
+          /* Full-screen view: pin the renderer to the viewport with a solid
+             surface background and roomy padding so the table reads more like
+             a document than an inline block. The inner scroll wrapper takes
+             the remaining height so wide tables still scroll horizontally
+             and tall ones scroll vertically. */
+          .lsp-mdtable-renderer.lsp-mdt-fs {
+            position: fixed; inset: 0; z-index: 2147483646;
+            margin: 0; padding: 24px 32px;
+            background: var(--ls-primary-background-color, #fff);
+            display: flex; flex-direction: column; gap: 8px;
+            overflow: auto;
+          }
+          .lsp-mdtable-renderer.lsp-mdt-fs .lsp-mdtable-scroll {
+            flex: 1 1 auto; min-height: 0; overflow: auto;
+          }
+          .lsp-mdtable-renderer.lsp-mdt-fs table.lsp-mdt th,
+          .lsp-mdtable-renderer.lsp-mdt-fs table.lsp-mdt td {
+            padding: 8px 12px !important; font-size: 14px;
+          }
+          .lsp-mdtable-renderer.lsp-mdt-fs .lsp-mdtable-text {
+            font-size: 14px;
+          }
+          .lsp-mdtable-renderer .lsp-mdtable-fs-bar { display: none; }
+          .lsp-mdtable-renderer.lsp-mdt-fs .lsp-mdtable-fs-bar {
+            display: flex; align-items: center; justify-content: flex-end;
+            gap: 6px; flex: 0 0 auto;
+          }
+          /* Hide the inline Edit / Full screen buttons while in full screen:
+             the exit button in the top bar takes their place. */
+          .lsp-mdtable-renderer.lsp-mdt-fs > .lsp-mdtable-edit { display: none; }
           .lsp-mdt-menu {
             position: fixed; z-index: 2147483647; min-width: 168px;
             padding: 4px; border-radius: 6px;
@@ -330,15 +360,49 @@ if (isInBrowser) {
               className: 'lsp-mdtable-edit',
               onClick: () => commandCallback({ uuid: id }) // existing modal flow
             }, i18n.t('Edit table')))
+            // Full-screen view: render the inline table itself in full screen
+            // (no modal). Click toggles a class on the renderer root; an
+            // Escape keydown also exits. While in full screen, an exit button
+            // is shown in the top bar (the inline button is hidden by CSS).
+            const enterFullscreen = (rootEl) => {
+              if (!rootEl || rootEl.classList.contains('lsp-mdt-fs')) return
+              rootEl.classList.add('lsp-mdt-fs')
+              const exitBtn = rootEl.querySelector('.lsp-mdtable-fs-exit')
+              if (exitBtn) exitBtn.textContent = i18n.t('Exit full screen')
+              const onKey = (ev) => {
+                if (ev.key === 'Escape') { ev.stopPropagation(); exitFullscreen(rootEl) }
+              }
+              rootEl._lspFsKey = onKey
+              document.addEventListener('keydown', onKey, true)
+            }
+            const exitFullscreen = (rootEl) => {
+              if (!rootEl || !rootEl.classList.contains('lsp-mdt-fs')) return
+              rootEl.classList.remove('lsp-mdt-fs')
+              if (rootEl._lspFsKey) {
+                document.removeEventListener('keydown', rootEl._lspFsKey, true)
+                rootEl._lspFsKey = null
+              }
+            }
+            const onFsClick = (e) => {
+              const root = e.currentTarget.closest('.lsp-mdtable-renderer')
+              if (!root) return
+              if (root.classList.contains('lsp-mdt-fs')) exitFullscreen(root)
+              else enterFullscreen(root)
+            }
+            // Top bar lives at the start of the renderer so the exit button
+            // sits in a consistent place when full screen is active. It's
+            // hidden by default and revealed by the .lsp-mdt-fs class.
+            children.unshift(React.createElement('div', {
+              key: 'fsbar',
+              className: 'lsp-mdtable-fs-bar'
+            }, React.createElement('button', {
+              className: 'lsp-mdtable-edit lsp-mdtable-fs-exit',
+              onClick: onFsClick
+            }, i18n.t('Exit full screen'))))
             children.push(React.createElement('button', {
               key: 'fullscreen',
               className: 'lsp-mdtable-edit lsp-mdtable-fullscreen',
-              onClick: () => {
-                // App.jsx reads lastFullscreen once on mount, so flipping it
-                // before opening the modal makes it launch full-screen.
-                try { logseq.updateSettings({ lastFullscreen: true }) } catch (e) { /* noop */ }
-                commandCallback({ uuid: id })
-              }
+              onClick: onFsClick
             }, i18n.t('Full screen')))
             const editable = logseq.settings?.inlineEditable !== false
             const dbRaw = Number(logseq.settings?.inlineEditDebounceMs)
