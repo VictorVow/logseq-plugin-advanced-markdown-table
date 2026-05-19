@@ -73,9 +73,10 @@ if (isInBrowser) {
         console.log('[faiz:] === woz-markdown-table-editor', e)
         logseqEditor.getBlock(e.uuid).then(block => {
           console.log('[faiz:] === block', block)
-          const { format, content } = block
-          // only support markdown
-          if (format !== 'markdown') return logseq.UI.showMsg(i18n.t('Markdown table editor only support markdown'), 'warning')
+          // @logseq/libs 0.3.3: block.content is deprecated in favour of block.title
+          const content = block.content ?? block.title ?? ''
+          // only support markdown (treat missing format as ok — DB-graph blocks may omit it)
+          if (block.format && block.format !== 'markdown') return logseq.UI.showMsg(i18n.t('Markdown table editor only support markdown'), 'warning')
 
           bootEditor(content, e.uuid)
 
@@ -118,7 +119,8 @@ if (isInBrowser) {
       // blocks with a read-only table + Edit button. Host-mounted via the
       // experimental Experiments API; a clean no-op on older Logseq hosts.
       const inlineEnabled = logseq.settings?.enableInlineRenderer !== false
-      if (inlineEnabled && typeof logseq.Experiments?.registerBlockRenderer === 'function') {
+      const hasBlockRenderer = typeof logseq.Experiments?.registerBlockRenderer === 'function'
+      if (inlineEnabled && hasBlockRenderer) {
         logseq.provideStyle(`
           .lsp-mdtable-renderer { margin: 4px 0; }
           .lsp-mdtable-renderer table {
