@@ -48,11 +48,19 @@ const findClipAncestor = (el) => {
 // Pin every .lsp-mdtable-scroll in `root` to the width actually available
 // at its position inside the clipping ancestor. Synchronous: collapse,
 // measure, restore — no paint happens between, so there is no flash.
+// Trailing scroll space (px) so a wide table can be scrolled far enough
+// that its last column clears Logseq's top-right "Switch to outline view"
+// button (which floats over the renderer's right edge).
+const BUTTON_CLEARANCE = 52
+
 export const fitInlineTableWidth = (root) => {
   if (!root || !root.isConnected) return
   const scrolls = root.querySelectorAll('.lsp-mdtable-scroll')
   if (!scrolls.length) return
-  scrolls.forEach(s => { s.style.maxWidth = '0px' }) // reflow to natural layout
+  scrolls.forEach(s => {
+    s.style.maxWidth = '0px'      // reflow to natural layout
+    s.style.paddingRight = ''     // measure true overflow without our spacer
+  })
   const clip = findClipAncestor(root)
   const clipRect = clip.getBoundingClientRect()
   const rootRect = root.getBoundingClientRect()
@@ -60,6 +68,12 @@ export const fitInlineTableWidth = (root) => {
   const avail = Math.floor(clip.clientWidth - leftGap - 8) // gutter for safety
   scrolls.forEach(s => {
     s.style.maxWidth = avail > 120 ? avail + 'px' : '100%'
+    // Only when the table is actually wider than its box: reserve end
+    // padding so the user can scroll the last column past the button.
+    // (Chromium includes a scroll container's end padding in scroll range.)
+    if (s.scrollWidth > s.clientWidth + 1) {
+      s.style.paddingRight = BUTTON_CLEARANCE + 'px'
+    }
   })
 }
 
