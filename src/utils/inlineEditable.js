@@ -20,6 +20,9 @@
 
 const debounceTimers = new Map() // blockId -> timeout handle
 const lastWritten = new Map()    // blockId -> last content we wrote (echo guard)
+// blockId -> {ord,rowIdx,colIdx}: re-anchor the pinned toolbar to this
+// position after a toolbar action causes the block to re-render.
+const pendingToolbar = new Map()
 
 // --- Width fitting -------------------------------------------------------
 //
@@ -282,7 +285,8 @@ const ICONS = {
   moveColLeft: SVG('<line x1="20" y1="12" x2="5" y2="12"/><polyline points="11 6 5 12 11 18"/>'),
   moveColRight:SVG('<line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>'),
   sortColAsc:  SVG('<path d="M11 5h3M11 10h6M11 15h9"/><polyline points="4 8 7 5 10 8"/><line x1="7" y1="5" x2="7" y2="19"/>'),
-  sortColDesc: SVG('<path d="M11 5h9M11 10h6M11 15h3"/><polyline points="4 16 7 19 10 16"/><line x1="7" y1="5" x2="7" y2="19"/>')
+  sortColDesc: SVG('<path d="M11 5h9M11 10h6M11 15h3"/><polyline points="4 16 7 19 10 16"/><line x1="7" y1="5" x2="7" y2="19"/>'),
+  pin: SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z"/>')
 }
 
 const closeMenu = (doc) => {
@@ -291,11 +295,11 @@ const closeMenu = (doc) => {
   if (el) el.remove()
 }
 
-const openContextMenu = (root, opts, cell, ev) => {
-  const doc = root.ownerDocument
-  const win = doc.defaultView || window
-  closeMenu(doc)
-
+// Shared item model for both the right-click menu and the pinned toolbar.
+// Returns the matrix-op items plus `ord` (which table in a multi-table
+// block). The pin toggle is appended separately by each caller since its
+// action depends on the surface.
+const buildItems = (root, opts, cell) => {
   const tableEl = cell.closest('table.lsp-mdt')
   const tr = cell.closest('tr')
   const rowIdx = Array.from(tableEl.querySelectorAll('tr')).indexOf(tr)
@@ -304,16 +308,15 @@ const openContextMenu = (root, opts, cell, ev) => {
   const rowCount = tableEl.querySelectorAll('tr').length
   const colCount = tr.querySelectorAll('th,td').length
   const L = opts.menuLabels || {}
-
   const items = [
     { icon: ICONS.insertRowAbove, label: L.insertRowAbove || 'Insert row above', enabled: rowIdx >= 1,
       run: m => tableOps.insertRowAbove(m, rowIdx) },
     { icon: ICONS.insertRowBelow, label: L.insertRowBelow || 'Insert row below', enabled: true,
       run: m => tableOps.insertRowBelow(m, rowIdx) },
     { icon: ICONS.moveRowUp, label: L.moveRowUp || 'Move row up', enabled: rowIdx >= 2,
-      hint: 'Ctrl+Shift+Enter', run: m => tableOps.moveRowUp(m, rowIdx) },
+      run: m => tableOps.moveRowUp(m, rowIdx) },
     { icon: ICONS.moveRowDown, label: L.moveRowDown || 'Move row down', enabled: rowIdx >= 1 && rowIdx < rowCount - 1,
-      hint: 'Ctrl+Enter', run: m => tableOps.moveRowDown(m, rowIdx) },
+      run: m => tableOps.moveRowDown(m, rowIdx) },
     { icon: ICONS.deleteRow, label: L.deleteRow || 'Delete row', enabled: rowCount >= 2,
       run: m => tableOps.deleteRow(m, rowIdx) },
     { sep: true },
@@ -333,14 +336,115 @@ const openContextMenu = (root, opts, cell, ev) => {
     { icon: ICONS.sortColDesc, label: L.sortColDesc || 'Sort column descending', enabled: rowCount >= 3,
       run: m => tableOps.sortColDesc(m, rowIdx, colIdx) }
   ]
+  return { items, ord }
+}
+
+const isPinned = (opts) => !!(opts.isPinned && opts.isPinned())
+
+// Pin/Unpin toggle item; `after(nowPinned)` lets the surface refresh.
+const pinItem = (opts, after) => {
+  const L = opts.menuLabels || {}
+  return {
+    icon: ICONS.pin,
+    label: isPinned(opts) ? (L.unpinToolbar || 'Unpin toolbar') : (L.pinToolbar || 'Pin toolbar'),
+    enabled: true,
+    action: () => {
+      const now = !isPinned(opts)
+      if (opts.setPinned) opts.setPinned(now)
+      after(now)
+    }
+  }
+}
+
+const removeToolbar = (doc) => {
+  const t = doc.querySelector('.lsp-mdt-toolbar')
+  if (t) t.remove()
+}
+
+// One scroll/resize binding per document keeps the pinned toolbar glued
+// to whichever cell currently has focus (stateless: no per-attach leak).
+const toolbarReflowDocs = new WeakSet()
+const bindToolbarReflow = (doc) => {
+  if (toolbarReflowDocs.has(doc)) return
+  toolbarReflowDocs.add(doc)
+  const win = doc.defaultView || window
+  const reflow = () => {
+    const bar = doc.querySelector('.lsp-mdt-toolbar')
+    if (!bar) return
+    const a = doc.activeElement
+    const cell = a && a.closest && a.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (cell && cell.isConnected) positionToolbar(cell, bar)
+  }
+  win.addEventListener('scroll', reflow, true)
+  win.addEventListener('resize', reflow)
+}
+
+const positionToolbar = (cell, bar) => {
+  const doc = bar.ownerDocument
+  const r = cell.getBoundingClientRect()
+  bar.style.visibility = 'hidden'
+  const bw = bar.offsetWidth, bh = bar.offsetHeight
+  const vw = doc.documentElement.clientWidth, vh = doc.documentElement.clientHeight
+  let top = r.bottom + 4
+  if (top + bh > vh - 4) top = Math.max(4, r.top - bh - 4) // flip above
+  bar.style.left = Math.max(4, Math.min(r.left, vw - bw - 4)) + 'px'
+  bar.style.top = top + 'px'
+  bar.style.visibility = ''
+}
+
+// Build the pinned icon-only horizontal toolbar under `cell`.
+const buildToolbar = (root, opts, cell) => {
+  const doc = root.ownerDocument
+  removeToolbar(doc)
+  if (!cell || !cell.isConnected) return
+  const { items, ord } = buildItems(root, opts, cell)
+  const aTr = cell.closest('tr')
+  const aRow = Array.from(cell.closest('table.lsp-mdt').querySelectorAll('tr')).indexOf(aTr)
+  const aCol = Array.from(aTr.querySelectorAll('th,td')).indexOf(cell)
+  const all = items.concat([{ sep: true },
+    pinItem(opts, () => removeToolbar(doc))]) // pinned bar's toggle = unpin
+
+  const bar = doc.createElement('div')
+  bar.className = 'lsp-mdt-toolbar'
+  all.forEach(it => {
+    if (it.sep) { const s = doc.createElement('span'); s.className = 'lsp-mdt-tb-sep'; bar.appendChild(s); return }
+    const b = doc.createElement('button')
+    b.type = 'button'
+    b.className = 'lsp-mdt-tb-btn' + (it.enabled ? '' : ' disabled')
+    b.title = it.label
+    b.innerHTML = it.icon || ''
+    if (it.enabled) {
+      b.addEventListener('mousedown', (e) => e.preventDefault()) // keep cell focus
+      b.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation()
+        if (it.action) { it.action(); return }
+        // Re-anchor the toolbar to this position after the re-render.
+        pendingToolbar.set(opts.blockId, { ord, rowIdx: aRow, colIdx: aCol })
+        commitStructural(root, opts, (m, i) => (i === ord ? it.run(m) : m))
+        removeToolbar(doc)
+      })
+    }
+    bar.appendChild(b)
+  })
+  doc.body.appendChild(bar)
+  positionToolbar(cell, bar)
+}
+
+const openContextMenu = (root, opts, cell, ev) => {
+  const doc = root.ownerDocument
+  const win = doc.defaultView || window
+  closeMenu(doc)
+
+  const { items, ord } = buildItems(root, opts, cell)
+  const all = items.concat([{ sep: true },
+    pinItem(opts, (now) => { if (now) buildToolbar(root, opts, cell); else removeToolbar(doc) })])
 
   const menu = doc.createElement('div')
   menu.className = 'lsp-mdt-menu'
-  items.forEach(it => {
+  all.forEach(it => {
     if (it.sep) { const s = doc.createElement('div'); s.className = 'lsp-mdt-menu-sep'; menu.appendChild(s); return }
     const mi = doc.createElement('div')
     mi.className = 'lsp-mdt-menu-item' + (it.enabled ? '' : ' disabled')
-    if (it.hint) mi.title = it.hint
     const ic = doc.createElement('span')
     ic.className = 'lsp-mdt-menu-icon'
     ic.innerHTML = it.icon || ''
@@ -352,6 +456,7 @@ const openContextMenu = (root, opts, cell, ev) => {
       mi.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation()
         closeMenu(doc)
+        if (it.action) { it.action(); return }
         commitStructural(root, opts, (m, i) => (i === ord ? it.run(m) : m))
       })
     }
@@ -536,14 +641,20 @@ const attachDragReorder = (root, opts) => {
 // Attach editing behaviour to a freshly-rendered renderer root. Idempotent:
 // if Logseq reuses the DOM node across re-renders we don't double-bind.
 export const attachInlineEditing = (root, opts) => {
-  if (!root || root.dataset.lspInlineEdit === '1') return
-  root.dataset.lspInlineEdit = '1'
+  if (!root) return
 
+  // Re-apply every render (idempotent): if Logseq reuses the root node but
+  // replaces the inner table, the new cells must still become editable and
+  // focusable — otherwise editing and toolbar refocus break after an op.
   root.querySelectorAll('table.lsp-mdt th, table.lsp-mdt td').forEach(cell => {
     cell.setAttribute('contenteditable', 'true')
     cell.setAttribute('tabindex', '0')
     cell.spellcheck = false
   })
+
+  // Listeners are delegated on root; bind them only once per node.
+  if (root.dataset.lspInlineEdit === '1') return
+  root.dataset.lspInlineEdit = '1'
 
   // Capture phase: stop pointer/key events from reaching Logseq, which would
   // otherwise swap the block into its raw textarea and unmount this renderer.
@@ -598,6 +709,54 @@ export const attachInlineEditing = (root, opts) => {
   }, true)
 
   attachDragReorder(root, opts)
+
+  // Pinned toolbar: while pinned, an icon-only horizontal toolbar tracks
+  // the focused cell (appears under it). Right-clicking still opens the
+  // full labelled menu.
+  root.addEventListener('focusin', (e) => {
+    const cell = e.target.closest && e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (cell && isPinned(opts)) buildToolbar(root, opts, cell)
+  })
+  root.addEventListener('focusout', (e) => {
+    const to = e.relatedTarget
+    if (to && to.closest && (to.closest('table.lsp-mdt') || to.closest('.lsp-mdt-toolbar'))) return
+    setTimeout(() => {
+      const a = root.ownerDocument.activeElement
+      if (!a || !(a.closest && (a.closest('table.lsp-mdt') || a.closest('.lsp-mdt-toolbar')))) {
+        removeToolbar(root.ownerDocument)
+      }
+    }, 0)
+  })
+  bindToolbarReflow(root.ownerDocument)
+}
+
+// After a pinned-toolbar action re-renders the block, refocus the cell at
+// the stashed position so the focus-driven toolbar reappears there. Called
+// from the renderer ref on every (re-)mount, so it works whether Logseq
+// reuses or replaces the root node.
+export const resumePinnedToolbar = (root, opts) => {
+  const pend = pendingToolbar.get(opts.blockId)
+  if (!pend) return
+  if (!isPinned(opts)) { pendingToolbar.delete(opts.blockId); return }
+  const win = root.ownerDocument.defaultView || window
+  // Try this render; if the table isn't resolvable yet (stale/intermediate
+  // render), keep `pend` so a later render retries instead of burning it.
+  const tryShow = (retry) => {
+    const tables = root.querySelectorAll('table.lsp-mdt')
+    const tableEl = tables[Math.min(pend.ord, tables.length - 1)]
+    const rows = tableEl && tableEl.querySelectorAll('tr')
+    const row = rows && rows[Math.min(pend.rowIdx, rows.length - 1)]
+    const cells = row && row.querySelectorAll('th,td')
+    const cell = cells && cells[Math.min(pend.colIdx, cells.length - 1)]
+    if (!cell || !cell.isConnected) {
+      if (retry > 0) win.setTimeout(() => tryShow(retry - 1), 50)
+      return
+    }
+    pendingToolbar.delete(opts.blockId)
+    buildToolbar(root, opts, cell) // build directly — don't depend on focus
+    caretToEnd(cell)              // caret continuity for the next op
+  }
+  win.requestAnimationFrame(() => tryShow(3))
 }
 
 // Called when the renderer for a block is torn down / re-created so a pending

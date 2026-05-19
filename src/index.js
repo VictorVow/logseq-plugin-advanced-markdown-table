@@ -7,7 +7,7 @@ import App from './pages/App'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
-import { attachInlineEditing, prepareInlineRenderer } from './utils/inlineEditable'
+import { attachInlineEditing, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
 // import { multipleTables, empty, longTables, onlyText, tableWithTextBeforeAndAfter } from './utils/testExample'
 import { longTables } from './utils/testExample'
 import i18n from './locales/i18n'
@@ -237,6 +237,32 @@ if (isInBrowser) {
             height: 1px; margin: 4px 6px;
             background: var(--ls-border-color);
           }
+          .lsp-mdt-toolbar {
+            position: fixed; z-index: 2147483646;
+            display: flex; align-items: center; gap: 2px;
+            padding: 3px; border-radius: 6px;
+            border: 1px solid var(--ls-border-color);
+            background: var(--ls-secondary-background-color, #2b2b2b);
+            box-shadow: 0 4px 14px rgba(0,0,0,.3);
+            user-select: none;
+          }
+          .lsp-mdt-tb-btn {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 26px; height: 26px; padding: 0; line-height: 0;
+            border: none; border-radius: 4px; cursor: pointer;
+            background: transparent; color: var(--ls-primary-text-color);
+          }
+          .lsp-mdt-tb-btn svg { display: block; }
+          .lsp-mdt-tb-btn:hover {
+            background: var(--ls-active-primary-color, #2563eb); color: #fff;
+          }
+          .lsp-mdt-tb-btn.disabled {
+            opacity: .35; cursor: default; pointer-events: none;
+          }
+          .lsp-mdt-tb-sep {
+            width: 1px; align-self: stretch; margin: 2px 3px;
+            background: var(--ls-border-color);
+          }
           /* Edge drag-reorder: subtle always-on grip hint on the table's
              top edge (columns) and left edge (rows). */
           .lsp-mdtable-renderer table.lsp-mdt {
@@ -313,11 +339,13 @@ if (isInBrowser) {
                   if (!el) return
                   prepareInlineRenderer(el)
                   if (editable) {
-                    attachInlineEditing(el, {
+                    const inlineOpts = {
                       segments,
                       blockId: id,
                       updateBlock: (b, c) => logseqEditor.updateBlock(b, c),
                       debounceMs,
+                      isPinned: () => logseq.settings?.toolbarPinned === true,
+                      setPinned: (v) => { try { logseq.updateSettings({ toolbarPinned: !!v }) } catch (e) { /* noop */ } },
                       menuLabels: {
                         insertRowAbove: i18n.t('Insert row above'),
                         insertRowBelow: i18n.t('Insert row below'),
@@ -330,9 +358,13 @@ if (isInBrowser) {
                         moveColLeft: i18n.t('Move column left'),
                         moveColRight: i18n.t('Move column right'),
                         sortColAsc: i18n.t('Sort column ascending'),
-                        sortColDesc: i18n.t('Sort column descending')
+                        sortColDesc: i18n.t('Sort column descending'),
+                        pinToolbar: i18n.t('Pin toolbar'),
+                        unpinToolbar: i18n.t('Unpin toolbar')
                       }
-                    })
+                    }
+                    attachInlineEditing(el, inlineOpts)
+                    resumePinnedToolbar(el, inlineOpts)
                   }
                 }
               }, children)

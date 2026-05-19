@@ -26,5 +26,7 @@
   "Move column left": "左移列",
   "Move column right": "右移列",
   "Sort column ascending": "按列升序排序",
-  "Sort column descending": "按列降序排序"
+  "Sort column descending": "按列降序排序",
+  "Pin toolbar": "固定工具栏",
+  "Unpin toolbar": "取消固定工具栏"
 }

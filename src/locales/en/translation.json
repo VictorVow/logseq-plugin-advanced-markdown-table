@@ -26,5 +26,7 @@
   "Move column left": "Move column left",
   "Move column right": "Move column right",
   "Sort column ascending": "Sort column ascending",
-  "Sort column descending": "Sort column descending"
+  "Sort column descending": "Sort column descending",
+  "Pin toolbar": "Pin toolbar",
+  "Unpin toolbar": "Unpin toolbar"
 }
