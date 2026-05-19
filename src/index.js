@@ -300,7 +300,13 @@ if (isInBrowser) {
                         deleteRow: i18n.t('Delete row'),
                         insertColLeft: i18n.t('Insert column left'),
                         insertColRight: i18n.t('Insert column right'),
-                        deleteCol: i18n.t('Delete column')
+                        deleteCol: i18n.t('Delete column'),
+                        moveRowUp: i18n.t('Move row up'),
+                        moveRowDown: i18n.t('Move row down'),
+                        moveColLeft: i18n.t('Move column left'),
+                        moveColRight: i18n.t('Move column right'),
+                        sortColAsc: i18n.t('Sort column ascending'),
+                        sortColDesc: i18n.t('Sort column descending')
                       }
                     })
                   }

@@ -191,13 +191,46 @@ const padRectangular = (m) => {
 }
 const newRow = (w) => Array(Math.max(1, w)).fill('')
 
+// Numeric when both sides parse as finite numbers; otherwise locale
+// text. Used by the sort ops; blank handling is done by the caller.
+const cmpVal = (a, b) => {
+  const as = String(a).trim(), bs = String(b).trim()
+  const an = Number(as), bn = Number(bs)
+  if (as !== '' && bs !== '' && Number.isFinite(an) && Number.isFinite(bn) && an !== bn)
+    return an - bn
+  return as.localeCompare(bs)
+}
+
+// Stable sort of body rows (header row 0 fixed) by column c.
+// dir = 1 ascending, -1 descending. Blank cells always sort last.
+const sortBody = (m, c, dir) => {
+  if (m.length < 3) return m
+  const idx = m.slice(1).map((row, i) => [row, i])
+  idx.sort(([p, pi], [q, qi]) => {
+    const pe = String(p[c] ?? '').trim() === ''
+    const qe = String(q[c] ?? '').trim() === ''
+    if (pe && qe) return pi - qi
+    if (pe) return 1
+    if (qe) return -1
+    const r = dir * cmpVal(p[c] ?? '', q[c] ?? '')
+    return r !== 0 ? r : pi - qi          // stable
+  })
+  return [m[0], ...idx.map(([row]) => row)]
+}
+
 const tableOps = {
   insertRowAbove: (m, r) => { const x = padRectangular(m); x.splice(r, 0, newRow(x[0].length)); return x },
   insertRowBelow: (m, r) => { const x = padRectangular(m); x.splice(r + 1, 0, newRow(x[0].length)); return x },
   deleteRow:      (m, r) => { const x = m.slice(); x.splice(r, 1); return x },
   insertColLeft:  (m, _r, c) => padRectangular(m).map(row => { const y = row.slice(); y.splice(c, 0, ''); return y }),
   insertColRight: (m, _r, c) => padRectangular(m).map(row => { const y = row.slice(); y.splice(c + 1, 0, ''); return y }),
-  deleteCol:      (m, _r, c) => m.map(row => { const y = row.slice(); y.splice(c, 1); return y })
+  deleteCol:      (m, _r, c) => m.map(row => { const y = row.slice(); y.splice(c, 1); return y }),
+  moveRowUp:   (m, r) => { if (r < 2) return m; const x = m.slice(); [x[r-1],x[r]]=[x[r],x[r-1]]; return x },
+  moveRowDown: (m, r) => { if (r < 1 || r >= m.length-1) return m; const x = m.slice(); [x[r],x[r+1]]=[x[r+1],x[r]]; return x },
+  moveColLeft: (m, _r, c) => { if (c < 1) return m; return m.map(row => { const y=row.slice(); [y[c-1],y[c]]=[y[c],y[c-1]]; return y }) },
+  moveColRight:(m, _r, c) => m.map(row => { if (c >= row.length-1) return row.slice(); const y=row.slice(); [y[c],y[c+1]]=[y[c+1],y[c]]; return y }),
+  sortColAsc:  (m, _r, c) => sortBody(m, c, 1),
+  sortColDesc: (m, _r, c) => sortBody(m, c, -1)
 }
 
 // 14px line icons (stroke=currentColor), matching the edit-pencil SVG style
@@ -210,7 +243,13 @@ const ICONS = {
   deleteRow: SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'),
   insertColLeft: SVG('<polyline points="8 8 4 12 8 16"/><line x1="4" y1="12" x2="13" y2="12"/><rect x="17" y="4" width="4" height="16" rx="1"/>'),
   insertColRight: SVG('<rect x="3" y="4" width="4" height="16" rx="1"/><line x1="11" y1="12" x2="20" y2="12"/><polyline points="16 8 20 12 16 16"/>'),
-  deleteCol: SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>')
+  deleteCol: SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'),
+  moveRowUp:   SVG('<line x1="12" y1="20" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/>'),
+  moveRowDown: SVG('<line x1="12" y1="4" x2="12" y2="19"/><polyline points="6 13 12 19 18 13"/>'),
+  moveColLeft: SVG('<line x1="20" y1="12" x2="5" y2="12"/><polyline points="11 6 5 12 11 18"/>'),
+  moveColRight:SVG('<line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>'),
+  sortColAsc:  SVG('<path d="M11 5h3M11 10h6M11 15h9"/><polyline points="4 8 7 5 10 8"/><line x1="7" y1="5" x2="7" y2="19"/>'),
+  sortColDesc: SVG('<path d="M11 5h9M11 10h6M11 15h3"/><polyline points="4 16 7 19 10 16"/><line x1="7" y1="5" x2="7" y2="19"/>')
 }
 
 const closeMenu = (doc) => {
@@ -238,6 +277,10 @@ const openContextMenu = (root, opts, cell, ev) => {
       run: m => tableOps.insertRowAbove(m, rowIdx) },
     { icon: ICONS.insertRowBelow, label: L.insertRowBelow || 'Insert row below', enabled: true,
       run: m => tableOps.insertRowBelow(m, rowIdx) },
+    { icon: ICONS.moveRowUp, label: L.moveRowUp || 'Move row up', enabled: rowIdx >= 2,
+      run: m => tableOps.moveRowUp(m, rowIdx) },
+    { icon: ICONS.moveRowDown, label: L.moveRowDown || 'Move row down', enabled: rowIdx >= 1 && rowIdx < rowCount - 1,
+      run: m => tableOps.moveRowDown(m, rowIdx) },
     { icon: ICONS.deleteRow, label: L.deleteRow || 'Delete row', enabled: rowCount >= 2,
       run: m => tableOps.deleteRow(m, rowIdx) },
     { sep: true },
@@ -245,8 +288,17 @@ const openContextMenu = (root, opts, cell, ev) => {
       run: m => tableOps.insertColLeft(m, rowIdx, colIdx) },
     { icon: ICONS.insertColRight, label: L.insertColRight || 'Insert column right', enabled: true,
       run: m => tableOps.insertColRight(m, rowIdx, colIdx) },
+    { icon: ICONS.moveColLeft, label: L.moveColLeft || 'Move column left', enabled: colIdx >= 1,
+      run: m => tableOps.moveColLeft(m, rowIdx, colIdx) },
+    { icon: ICONS.moveColRight, label: L.moveColRight || 'Move column right', enabled: colIdx < colCount - 1,
+      run: m => tableOps.moveColRight(m, rowIdx, colIdx) },
     { icon: ICONS.deleteCol, label: L.deleteCol || 'Delete column', enabled: colCount >= 2,
-      run: m => tableOps.deleteCol(m, rowIdx, colIdx) }
+      run: m => tableOps.deleteCol(m, rowIdx, colIdx) },
+    { sep: true },
+    { icon: ICONS.sortColAsc, label: L.sortColAsc || 'Sort column ascending', enabled: rowCount >= 3,
+      run: m => tableOps.sortColAsc(m, rowIdx, colIdx) },
+    { icon: ICONS.sortColDesc, label: L.sortColDesc || 'Sort column descending', enabled: rowCount >= 3,
+      run: m => tableOps.sortColDesc(m, rowIdx, colIdx) }
   ]
 
   const menu = doc.createElement('div')

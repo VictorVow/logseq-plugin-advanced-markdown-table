@@ -20,5 +20,11 @@
   "Edit table": "Edit table",
   "Full screen": "Full screen",
   "Exit full screen": "Exit full screen",
-  "Edit Markdown Table": "Edit Markdown Table"
+  "Edit Markdown Table": "Edit Markdown Table",
+  "Move row up": "Move row up",
+  "Move row down": "Move row down",
+  "Move column left": "Move column left",
+  "Move column right": "Move column right",
+  "Sort column ascending": "Sort column ascending",
+  "Sort column descending": "Sort column descending"
 }

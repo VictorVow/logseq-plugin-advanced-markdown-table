@@ -20,5 +20,11 @@
   "Edit table": "编辑表格",
   "Full screen": "全屏",
   "Exit full screen": "退出全屏",
-  "Edit Markdown Table": "编辑 Markdown 表格"
+  "Edit Markdown Table": "编辑 Markdown 表格",
+  "Move row up": "上移行",
+  "Move row down": "下移行",
+  "Move column left": "左移列",
+  "Move column right": "右移列",
+  "Sort column ascending": "按列升序排序",
+  "Sort column descending": "按列降序排序"
 }
