@@ -431,12 +431,32 @@ const bindToolbarReflow = (doc) => {
 const positionToolbar = (cell, bar) => {
   const doc = bar.ownerDocument
   const r = cell.getBoundingClientRect()
+  // Confine the toolbar to the renderer's bounds so it can't drift over
+  // the sidebars or other blocks when the user scrolls the cell off-screen
+  // (vertically out of view, or horizontally past the table's scroll box).
+  const renderer = cell.closest('.lsp-mdtable-renderer')
+  const rr = renderer ? renderer.getBoundingClientRect() : r
+  const vw = doc.documentElement.clientWidth, vh = doc.documentElement.clientHeight
+  // Visible slice of the renderer within the viewport.
+  const visL = Math.max(4, rr.left)
+  const visR = Math.min(vw - 4, rr.right)
+  const visT = Math.max(4, rr.top)
+  const visB = Math.min(vh - 4, rr.bottom)
+  // If the cell isn't visible inside the renderer's visible slice at all,
+  // hide the toolbar rather than parking it somewhere unrelated.
+  const cellVisible =
+    r.right > visL && r.left < visR && r.bottom > visT && r.top < visB
+  if (!cellVisible || visR <= visL || visB <= visT) {
+    bar.style.visibility = 'hidden'
+    return
+  }
   bar.style.visibility = 'hidden'
   const bw = bar.offsetWidth, bh = bar.offsetHeight
-  const vw = doc.documentElement.clientWidth, vh = doc.documentElement.clientHeight
   let top = r.bottom + 4
-  if (top + bh > vh - 4) top = Math.max(4, r.top - bh - 4) // flip above
-  bar.style.left = Math.max(4, Math.min(r.left, vw - bw - 4)) + 'px'
+  if (top + bh > visB) top = Math.max(visT, r.top - bh - 4) // flip above
+  top = Math.max(visT, Math.min(top, visB - bh))
+  const left = Math.max(visL, Math.min(r.left, visR - bw))
+  bar.style.left = left + 'px'
   bar.style.top = top + 'px'
   bar.style.visibility = ''
 }
