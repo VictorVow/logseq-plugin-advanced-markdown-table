@@ -136,6 +136,26 @@ export class TableUtil {
     }
   };
 
+  // Trim leading/trailing whitespace from every cell's text.
+  normalize = () => {
+    const [tableNode] = Editor.nodes(this.editor, {
+      at: [],
+      match: (n) =>
+        !Editor.isEditor(n) && Element.isElement(n) && n.type === "table",
+      mode: "highest"
+    });
+    if (!tableNode) return;
+    const [oldTable, path] = tableNode;
+    const trimmedText = Array.from(oldTable.children, (row) =>
+      Array.from(row.children, (cell) =>
+        String(cell.children?.[0]?.text ?? '').trim())
+    );
+    Transforms.removeNodes(this.editor, { at: path });
+    Transforms.insertNodes(this.editor, createTableNode(trimmedText), {
+      at: path
+    });
+  };
+
   moveCursor = (tableNode, selection, action = 'cursor-next') => {
     const { focus } = selection
     const cursorPosition = { row: focus?.path[1], column: focus?.path[2] }

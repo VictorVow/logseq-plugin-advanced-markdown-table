@@ -1,5 +1,5 @@
 import { useSlate } from 'slate-react'
-import { InsertRowAboveOutlined, InsertRowBelowOutlined, InsertRowLeftOutlined, InsertRowRightOutlined, DeleteRowOutlined, DeleteColumnOutlined } from '@ant-design/icons'
+import { InsertRowAboveOutlined, InsertRowBelowOutlined, InsertRowLeftOutlined, InsertRowRightOutlined, DeleteRowOutlined, DeleteColumnOutlined, ClearOutlined } from '@ant-design/icons'
 import { Tooltip } from 'antd'
 import { useTranslation } from 'react-i18next'
 
@@ -14,6 +14,11 @@ const ToolBar = () => {
   const handleButtonClick = (e, action) => {
     e.preventDefault()
     table.edit(action)
+  }
+
+  const handleNormalize = (e) => {
+    e.preventDefault()
+    table.normalize()
   }
 
   return (
@@ -38,6 +43,12 @@ const ToolBar = () => {
       </Tooltip>
       <Tooltip title={t('delete column')} arrowPointAtCenter placement="topLeft">
         <DeleteColumnOutlined className="text-xl cursor-pointer hover:opacity-70" onMouseDown={e => handleButtonClick(e, 'delete-column')} />
+      </Tooltip>
+
+      <div className="border-l border-gray-300 dark:border-gray-600"></div>
+
+      <Tooltip title={t('normalise data')} arrowPointAtCenter placement="topLeft">
+        <ClearOutlined className="text-xl cursor-pointer hover:opacity-70" onMouseDown={handleNormalize} />
       </Tooltip>
 
     </div>

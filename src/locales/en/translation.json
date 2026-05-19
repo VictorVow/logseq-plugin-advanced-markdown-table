@@ -10,6 +10,7 @@
   "insert column before": "insert column before",
   "insert column after": "insert column after",
   "delete column": "delete column",
+  "normalise data": "normalise data (trim whitespace in cells)",
   "uuid error": "uuid error",
   "markdown table overwrite success": "markdown table overwrite success",
   "markdown table overwrite error": "markdown table overwrite error",

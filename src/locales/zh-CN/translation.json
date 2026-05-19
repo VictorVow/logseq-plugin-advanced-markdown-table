@@ -10,6 +10,7 @@
   "insert column before": "在左侧插入新列",
   "insert column after": "在右侧插入新列",
   "delete column": "删除列",
+  "normalise data": "规范化数据（去除单元格首尾空格）",
   "uuid error": "uuid 错误",
   "markdown table overwrite success": "markdown 表格覆盖成功",
   "markdown table overwrite error": "markdown 表格覆盖失败",
