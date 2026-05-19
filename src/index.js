@@ -95,11 +95,11 @@ if (isInBrowser) {
           try { await logseqEditor.exitEditingMode?.() } catch (_) { /* noop */ }
 
           // Wait for the renderer to mount, then drop the caret into the
-          // first body cell so the user can start typing immediately.
+          // first header cell (row 1) so the user can start typing immediately.
           let hostDoc = null
           try { hostDoc = (window.top || window.parent)?.document } catch (_) { /* cross-origin */ }
           if (!hostDoc) return
-          const selector = `.lsp-mdtable-renderer[data-blockid="${CSS.escape(String(block.uuid))}"] table.lsp-mdt tbody td`
+          const selector = `.lsp-mdtable-renderer[data-blockid="${CSS.escape(String(block.uuid))}"] table.lsp-mdt thead th`
           const deadline = Date.now() + 2000
           const tryFocus = () => {
             const cell = hostDoc.querySelector(selector)

@@ -452,9 +452,23 @@ const positionToolbar = (cell, bar) => {
   }
   bar.style.visibility = 'hidden'
   const bw = bar.offsetWidth, bh = bar.offsetHeight
-  let top = r.bottom + 4
-  if (top + bh > visB) top = Math.max(visT, r.top - bh - 4) // flip above
-  top = Math.max(visT, Math.min(top, visB - bh))
+  // For very short tables (≤2 rows total), the default below-cell anchor
+  // would sit on top of the other row. Anchor above the whole block instead
+  // and don't clamp it back inside the renderer — the toolbar is allowed to
+  // extend above the block (over the page chrome) so it never covers a row.
+  const table = cell.closest('table.lsp-mdt')
+  const rowCount = table ? table.querySelectorAll('tr').length : 0
+  const tr = table ? table.getBoundingClientRect() : r
+  const shortTable = rowCount > 0 && rowCount <= 2
+  let top, clampTop = visT
+  if (shortTable) {
+    top = tr.top - bh - 4
+    clampTop = 4 // allow toolbar above the renderer, but keep it on-screen
+  } else {
+    top = r.bottom + 4
+    if (top + bh > visB) top = Math.max(visT, r.top - bh - 4) // flip above
+  }
+  top = Math.max(clampTop, Math.min(top, visB - bh))
   const left = Math.max(visL, Math.min(r.left, visR - bw))
   bar.style.left = left + 'px'
   bar.style.top = top + 'px'
