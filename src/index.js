@@ -38,6 +38,13 @@ const settingsSchema = [
     default: true,
     title: 'Inline table rendering',
     description: "Render markdown-table blocks inline as tables (replacing Logseq's native outline view), with an Edit button. Requires a Logseq version that supports the experimental block renderer API; ignored on older versions. Reload the plugin after changing this."
+  },
+  {
+    key: 'nativeTableEditButton',
+    type: 'boolean',
+    default: true,
+    title: 'Native table edit button',
+    description: "Show an \"Edit Markdown Table\" button (top-left, on hover) over Logseq's natively-rendered markdown tables; clicking opens the table editor. Reload the plugin after changing this."
   }
 ]
 
@@ -198,6 +205,64 @@ if (isInBrowser) {
               { className: 'lsp-mdtable-renderer' }, children)
           }
         })
+      }
+
+      // Native table edit button: overlay a hover "Edit Markdown Table"
+      // button on Logseq's natively-rendered markdown tables (host DOM).
+      const nativeBtnEnabled = logseq.settings?.nativeTableEditButton !== false
+      if (nativeBtnEnabled) {
+        logseq.provideStyle(`
+          .markdown-table { position: relative; }
+          .markdown-table .lsp-native-edit-btn {
+            position: absolute; top: 4px; left: 4px; z-index: 5;
+            opacity: 0; pointer-events: none; transition: opacity .12s;
+            display: inline-flex; align-items: center; justify-content: center;
+            padding: 4px; line-height: 0; cursor: pointer;
+            border: 1px solid var(--ls-border-color); border-radius: 4px;
+            background: var(--ls-secondary-background-color);
+            color: var(--ls-primary-text-color);
+          }
+          .markdown-table .lsp-native-edit-btn svg { display: block; }
+          .markdown-table:hover .lsp-native-edit-btn { opacity: 1; pointer-events: auto; }
+        `)
+
+        let hostDoc = null
+        try { hostDoc = (window.top || window.parent)?.document } catch (e) { /* cross-origin */ }
+        if (!hostDoc) {
+          console.warn('[mdtable] native edit button: host document not accessible; skipped')
+        } else {
+          const label = i18n.t('Edit Markdown Table')
+          const decorate = () => {
+            hostDoc.querySelectorAll('.markdown-table:not([data-lsp-edit])').forEach(wrap => {
+              wrap.dataset.lspEdit = '1'
+              const btn = hostDoc.createElement('button')
+              btn.className = 'lsp-native-edit-btn'
+              btn.type = 'button'
+              btn.title = label
+              btn.setAttribute('aria-label', label)
+              btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>'
+              btn.addEventListener('click', (ev) => {
+                ev.preventDefault(); ev.stopPropagation()
+                const blk = wrap.closest('.ls-block')
+                const uuid = blk && blk.getAttribute('blockid')
+                if (uuid) commandCallback({ uuid })
+                else logseq.UI.showMsg(i18n.t('uuid error'), 'warning')
+              })
+              wrap.prepend(btn)
+            })
+          }
+          decorate()
+          let scheduled = false
+          const obs = new MutationObserver(() => {
+            if (scheduled) return
+            scheduled = true
+            ;(hostDoc.defaultView || window).requestAnimationFrame(() => {
+              scheduled = false
+              decorate()
+            })
+          })
+          obs.observe(hostDoc.body, { childList: true, subtree: true })
+        }
       }
 
       // Register keyboard shortcut from settings
