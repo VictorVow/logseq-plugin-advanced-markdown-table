@@ -21,20 +21,6 @@ const applyTheme = (mode) => {
 // Settings schema
 const settingsSchema = [
   {
-    key: 'enableInlineRenderer',
-    type: 'boolean',
-    default: true,
-    title: 'Inline table rendering',
-    description: "Render markdown-table blocks inline as tables (replacing Logseq's native outline view). Requires a Logseq version that supports the experimental block renderer API; ignored on older versions. Reload the plugin after changing this."
-  },
-  {
-    key: 'inlineEditable',
-    type: 'boolean',
-    default: true,
-    title: 'Edit inline tables in place',
-    description: "Make the inline-rendered table's cells editable directly (debounced auto-save back to the block). When off, the inline table is read-only. Requires \"Inline table rendering\". Reload the plugin after changing this."
-  },
-  {
     key: 'inlineEditDebounceMs',
     type: 'number',
     default: 500,
@@ -54,6 +40,13 @@ const settingsSchema = [
     default: -1,
     title: 'Monospace table font size offset (px)',
     description: "Adjust the monospace table-source font size relative to Logseq's base font, in pixels (e.g. -1 = 1px smaller, 0 = same, 2 = 2px larger). Reload the plugin after changing this."
+  },
+  {
+    key: 'toolbarPinned',
+    type: 'boolean',
+    default: true,
+    title: 'Pin inline table toolbar by default',
+    description: 'When enabled, the inline table toolbar stays pinned above the focused table. You can still toggle pinning at runtime from the toolbar/right-click menu.'
   }
 ]
 
@@ -203,9 +196,8 @@ if (isInBrowser) {
       // Inline block renderer: replace Logseq's native view for markdown-table
       // blocks with an editable table. Host-mounted via the experimental
       // Experiments API; a clean no-op on older Logseq hosts.
-      const inlineEnabled = logseq.settings?.enableInlineRenderer !== false
       const hasBlockRenderer = typeof logseq.Experiments?.registerBlockRenderer === 'function'
-      if (inlineEnabled && hasBlockRenderer) {
+      if (hasBlockRenderer) {
         logseq.provideStyle(`
           /* min-width:0 lets this shrink inside Logseq's flex block layout;
              without it the max-content table stretches the whole block past
@@ -386,7 +378,6 @@ if (isInBrowser) {
                         React.createElement('td', { key: ci, style: cellStyle }, row[ci] ?? '')))))
                 ]))
             })
-            const editable = logseq.settings?.inlineEditable !== false
             const dbRaw = Number(logseq.settings?.inlineEditDebounceMs)
             const debounceMs = Number.isFinite(dbRaw) && dbRaw >= 0 ? dbRaw : 500
             return React.createElement('div',
@@ -396,36 +387,34 @@ if (isInBrowser) {
                 ref: (el) => {
                   if (!el) return
                   prepareInlineRenderer(el)
-                  if (editable) {
-                    const inlineOpts = {
-                      segments,
-                      blockId: id,
-                      updateBlock: (b, c) => logseqEditor.updateBlock(b, c),
-                      debounceMs,
-                      isPinned: () => logseq.settings?.toolbarPinned === true,
-                      setPinned: (v) => { try { logseq.updateSettings({ toolbarPinned: !!v }) } catch (e) { /* noop */ } },
-                      menuLabels: {
-                        insertRowAbove: i18n.t('Insert row above'),
-                        insertRowBelow: i18n.t('Insert row below'),
-                        deleteRow: i18n.t('Delete row'),
-                        insertColLeft: i18n.t('Insert column left'),
-                        insertColRight: i18n.t('Insert column right'),
-                        deleteCol: i18n.t('Delete column'),
-                        moveRowUp: i18n.t('Move row up'),
-                        moveRowDown: i18n.t('Move row down'),
-                        moveColLeft: i18n.t('Move column left'),
-                        moveColRight: i18n.t('Move column right'),
-                        sortColAsc: i18n.t('Sort column ascending'),
-                        sortColDesc: i18n.t('Sort column descending'),
-                        pinToolbar: i18n.t('Pin toolbar'),
-                        unpinToolbar: i18n.t('Unpin toolbar'),
-                        fullScreen: i18n.t('Full screen'),
-                        exitFullScreen: i18n.t('Exit full screen')
-                      }
+                  const inlineOpts = {
+                    segments,
+                    blockId: id,
+                    updateBlock: (b, c) => logseqEditor.updateBlock(b, c),
+                    debounceMs,
+                    isPinned: () => logseq.settings?.toolbarPinned === true,
+                    setPinned: (v) => { try { logseq.updateSettings({ toolbarPinned: !!v }) } catch (e) { /* noop */ } },
+                    menuLabels: {
+                      insertRowAbove: i18n.t('Insert row above'),
+                      insertRowBelow: i18n.t('Insert row below'),
+                      deleteRow: i18n.t('Delete row'),
+                      insertColLeft: i18n.t('Insert column left'),
+                      insertColRight: i18n.t('Insert column right'),
+                      deleteCol: i18n.t('Delete column'),
+                      moveRowUp: i18n.t('Move row up'),
+                      moveRowDown: i18n.t('Move row down'),
+                      moveColLeft: i18n.t('Move column left'),
+                      moveColRight: i18n.t('Move column right'),
+                      sortColAsc: i18n.t('Sort column ascending'),
+                      sortColDesc: i18n.t('Sort column descending'),
+                      pinToolbar: i18n.t('Pin toolbar'),
+                      unpinToolbar: i18n.t('Unpin toolbar'),
+                      fullScreen: i18n.t('Full screen'),
+                      exitFullScreen: i18n.t('Exit full screen')
                     }
-                    attachInlineEditing(el, inlineOpts)
-                    resumePinnedToolbar(el, inlineOpts)
                   }
+                  attachInlineEditing(el, inlineOpts)
+                  resumePinnedToolbar(el, inlineOpts)
                 }
               }, children)
           }
