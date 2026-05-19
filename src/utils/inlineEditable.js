@@ -64,6 +64,20 @@ export const fitInlineTableWidth = (root) => {
     s.style.maxWidth = '0px'      // reflow to natural layout
     s.style.paddingRight = ''     // measure true overflow without our spacer
   })
+  // In fullscreen the renderer itself defines the available width; the
+  // Logseq block clip ancestor is irrelevant. Let the scroll wrapper fill
+  // the fullscreen viewport so the table can render edge-to-edge.
+  const doc = root.ownerDocument
+  const fsEl = doc.fullscreenElement || doc.webkitFullscreenElement
+  if (fsEl && fsEl.contains(root)) {
+    scrolls.forEach(s => {
+      s.style.maxWidth = '100%'
+      if (s.scrollWidth > s.clientWidth + 1) {
+        s.style.paddingRight = BUTTON_CLEARANCE + 'px'
+      }
+    })
+    return
+  }
   const clip = findClipAncestor(root)
   const clipRect = clip.getBoundingClientRect()
   const rootRect = root.getBoundingClientRect()
@@ -89,12 +103,15 @@ const bindResizeRefit = (root) => {
   if (resizeBoundDocs.has(doc)) return
   resizeBoundDocs.add(doc)
   let t
-  win.addEventListener('resize', () => {
+  const refitAll = () => {
     clearTimeout(t)
     t = setTimeout(() => {
       doc.querySelectorAll('.lsp-mdtable-renderer').forEach(fitInlineTableWidth)
     }, 100)
-  })
+  }
+  win.addEventListener('resize', refitAll)
+  doc.addEventListener('fullscreenchange', refitAll)
+  doc.addEventListener('webkitfullscreenchange', refitAll)
 }
 
 // Called from the renderer's ref on every (re-)mount, regardless of whether

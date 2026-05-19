@@ -186,6 +186,9 @@ if (isInBrowser) {
             overflow: auto; box-sizing: border-box;
           }
           .lsp-mdtable-renderer:fullscreen .lsp-mdtable-scroll { overflow: auto; }
+          .lsp-mdtable-renderer:fullscreen table.lsp-mdt {
+            width: 100% !important; min-width: max-content;
+          }
           .lsp-mdtable-renderer:fullscreen table.lsp-mdt th,
           .lsp-mdtable-renderer:fullscreen table.lsp-mdt td {
             padding: 8px 12px !important; font-size: 14px;
