@@ -127,17 +127,24 @@ if (isInBrowser) {
             display: block; width: 100%; max-width: 100%;
             overflow-x: auto; overflow-y: hidden;
           }
-          .lsp-mdtable-renderer table {
+          .lsp-mdtable-renderer table.lsp-mdt {
             border-collapse: collapse;
             width: max-content !important; max-width: none !important;
             color: var(--ls-primary-text-color);
           }
-          .lsp-mdtable-renderer th, .lsp-mdtable-renderer td {
-            border: 1px solid var(--ls-border-color); padding: 4px 8px;
-            text-align: left !important; vertical-align: top !important;
-            white-space: pre;
+          .lsp-mdtable-renderer .lsp-mdtable-scroll table.lsp-mdt th,
+          .lsp-mdtable-renderer .lsp-mdtable-scroll table.lsp-mdt td {
+            border: 1px solid var(--ls-border-color) !important;
+            padding: 4px 8px !important;
+            text-align: left !important;
+            vertical-align: top !important;
+            white-space: pre !important;
+            word-break: normal !important;
           }
-          .lsp-mdtable-renderer th { background: var(--ls-secondary-background-color); }
+          .lsp-mdtable-renderer .lsp-mdtable-scroll table.lsp-mdt th {
+            background: var(--ls-secondary-background-color) !important;
+            font-weight: 600 !important;
+          }
           .lsp-mdtable-renderer .lsp-mdtable-text { white-space: pre-wrap; opacity: .85; }
           .lsp-mdtable-renderer .lsp-mdtable-edit {
             margin-top: 6px; padding: 2px 10px; font-size: 12px; cursor: pointer;
@@ -167,16 +174,19 @@ if (isInBrowser) {
               }
               const matrix = markdownTableToMatrix(seg.str)
               const [head = [], ...body] = matrix
+              // Inline styles beat Logseq's higher-specificity prose/table
+              // rules (which were overriding our class-based stylesheet).
+              const cellStyle = { textAlign: 'left', verticalAlign: 'top', whiteSpace: 'pre' }
               return React.createElement('div',
                 { key: 's' + si, className: 'lsp-mdtable-scroll' },
-                React.createElement('table', null, [
+                React.createElement('table', { className: 'lsp-mdt' }, [
                   React.createElement('thead', { key: 'h' },
                     React.createElement('tr', null,
-                      head.map((c, i) => React.createElement('th', { key: i }, c)))),
+                      head.map((c, i) => React.createElement('th', { key: i, style: cellStyle }, c)))),
                   React.createElement('tbody', { key: 'b' },
                     body.map((row, ri) => React.createElement('tr', { key: ri },
                       head.map((_, ci) =>
-                        React.createElement('td', { key: ci }, row[ci] ?? '')))))
+                        React.createElement('td', { key: ci, style: cellStyle }, row[ci] ?? '')))))
                 ]))
             })
             children.push(React.createElement('button', {
