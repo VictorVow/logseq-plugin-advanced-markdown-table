@@ -7,7 +7,7 @@ import App from './pages/App'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
-import { attachInlineEditing } from './utils/inlineEditable'
+import { attachInlineEditing, prepareInlineRenderer } from './utils/inlineEditable'
 // import { multipleTables, empty, longTables, onlyText, tableWithTextBeforeAndAfter } from './utils/testExample'
 import { longTables } from './utils/testExample'
 import i18n from './locales/i18n'
@@ -158,9 +158,18 @@ if (isInBrowser) {
       const hasBlockRenderer = typeof logseq.Experiments?.registerBlockRenderer === 'function'
       if (inlineEnabled && hasBlockRenderer) {
         logseq.provideStyle(`
-          .lsp-mdtable-renderer { margin: 4px 0; max-width: 100%; }
+          /* min-width:0 lets this shrink inside Logseq's flex block layout;
+             without it the max-content table stretches the whole block past
+             the viewport (clipping the last column and hiding Logseq's
+             top-right "Switch to outline view" button) instead of the
+             wrapper below scrolling. */
+          .lsp-mdtable-renderer {
+            margin: 4px 0; width: 100%; max-width: 100%;
+            min-width: 0; box-sizing: border-box;
+          }
           .lsp-mdtable-renderer .lsp-mdtable-scroll {
             display: block; width: 100%; max-width: 100%;
+            min-width: 0; box-sizing: border-box;
             overflow-x: auto; overflow-y: hidden;
           }
           .lsp-mdtable-renderer table.lsp-mdt {
@@ -246,7 +255,9 @@ if (isInBrowser) {
               {
                 className: 'lsp-mdtable-renderer',
                 ref: (el) => {
-                  if (el && editable) {
+                  if (!el) return
+                  prepareInlineRenderer(el)
+                  if (editable) {
                     attachInlineEditing(el, {
                       segments,
                       blockId: id,
