@@ -132,31 +132,170 @@ const readCell = (el) => {
     .replace(/\n/g, '[:br]')
 }
 
+// Current DOM state of one rendered table as a matrix (header row first).
+const readTableMatrix = (tableEl) =>
+  Array.from(tableEl.querySelectorAll('tr')).map(tr =>
+    Array.from(tr.querySelectorAll('th,td')).map(readCell))
+
 // Rebuild the whole block from the original segments, substituting each
 // table segment with the current DOM state of its rendered table (in order).
-const buildContent = (root, segments) => {
+// `transform(matrix, tableOrdinal)` may return a modified matrix to apply a
+// structural change to one specific table.
+const buildContent = (root, segments, transform) => {
   const tables = root.querySelectorAll('table.lsp-mdt')
   let ti = 0
   return segments.map(seg => {
     if (seg.type !== 'table') return seg.str
+    const ord = ti
     const tableEl = tables[ti++]
     if (!tableEl) return seg.str
-    const rows = Array.from(tableEl.querySelectorAll('tr')).map(tr =>
-      Array.from(tr.querySelectorAll('th,td')).map(readCell))
+    let rows = readTableMatrix(tableEl)
+    if (transform) rows = transform(rows, ord)
     return serializeMatrix(rows)
   }).join('\n')
+}
+
+const writeContent = (blockId, content, updateBlock) => {
+  if (lastWritten.get(blockId) === content) return // nothing changed
+  lastWritten.set(blockId, content)
+  Promise.resolve(updateBlock(blockId, content)).catch(err =>
+    console.warn('[mdtable] inline table save failed', err))
 }
 
 const scheduleSave = (root, { segments, blockId, updateBlock, debounceMs }) => {
   clearTimeout(debounceTimers.get(blockId))
   debounceTimers.set(blockId, setTimeout(() => {
     debounceTimers.delete(blockId)
-    const content = buildContent(root, segments)
-    if (lastWritten.get(blockId) === content) return // nothing changed
-    lastWritten.set(blockId, content)
-    Promise.resolve(updateBlock(blockId, content)).catch(err =>
-      console.warn('[mdtable] inline edit save failed', err))
+    writeContent(blockId, buildContent(root, segments), updateBlock)
   }, debounceMs))
+}
+
+// Apply a structural change immediately (no debounce). Any pending
+// keystroke save is folded in first (it reads the same live DOM).
+const commitStructural = (root, { segments, blockId, updateBlock }, transform) => {
+  clearTimeout(debounceTimers.get(blockId))
+  debounceTimers.delete(blockId)
+  writeContent(blockId, buildContent(root, segments, transform), updateBlock)
+}
+
+// --- Right-click menu ----------------------------------------------------
+//
+// Logseq has no per-cell context-menu API; the block renderer gives us the
+// DOM, so we build our own. Structural ops below operate on the matrix and
+// are written through the same serialize/updateBlock path as edits, so an
+// inline structural change round-trips identically to a modal one.
+
+const padRectangular = (m) => {
+  const w = Math.max(1, ...m.map(r => r.length))
+  return m.map(r => r.concat(Array(Math.max(0, w - r.length)).fill('')))
+}
+const newRow = (w) => Array(Math.max(1, w)).fill('')
+
+const tableOps = {
+  insertRowAbove: (m, r) => { const x = padRectangular(m); x.splice(r, 0, newRow(x[0].length)); return x },
+  insertRowBelow: (m, r) => { const x = padRectangular(m); x.splice(r + 1, 0, newRow(x[0].length)); return x },
+  deleteRow:      (m, r) => { const x = m.slice(); x.splice(r, 1); return x },
+  insertColLeft:  (m, _r, c) => padRectangular(m).map(row => { const y = row.slice(); y.splice(c, 0, ''); return y }),
+  insertColRight: (m, _r, c) => padRectangular(m).map(row => { const y = row.slice(); y.splice(c + 1, 0, ''); return y }),
+  deleteCol:      (m, _r, c) => m.map(row => { const y = row.slice(); y.splice(c, 1); return y })
+}
+
+// 14px line icons (stroke=currentColor), matching the edit-pencil SVG style
+// used elsewhere. Chevron = direction of insertion; trash = delete.
+const SVG = (body) =>
+  `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${body}</svg>`
+const ICONS = {
+  insertRowAbove: SVG('<polyline points="8 8 12 4 16 8"/><line x1="12" y1="4" x2="12" y2="13"/><rect x="4" y="17" width="16" height="4" rx="1"/>'),
+  insertRowBelow: SVG('<rect x="4" y="3" width="16" height="4" rx="1"/><line x1="12" y1="11" x2="12" y2="20"/><polyline points="8 16 12 20 16 16"/>'),
+  deleteRow: SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'),
+  insertColLeft: SVG('<polyline points="8 8 4 12 8 16"/><line x1="4" y1="12" x2="13" y2="12"/><rect x="17" y="4" width="4" height="16" rx="1"/>'),
+  insertColRight: SVG('<rect x="3" y="4" width="4" height="16" rx="1"/><line x1="11" y1="12" x2="20" y2="12"/><polyline points="16 8 20 12 16 16"/>'),
+  deleteCol: SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>')
+}
+
+const closeMenu = (doc) => {
+  const el = doc.querySelector('.lsp-mdt-menu')
+  if (el && el._cleanup) el._cleanup()
+  if (el) el.remove()
+}
+
+const openContextMenu = (root, opts, cell, ev) => {
+  const doc = root.ownerDocument
+  const win = doc.defaultView || window
+  closeMenu(doc)
+
+  const tableEl = cell.closest('table.lsp-mdt')
+  const tr = cell.closest('tr')
+  const rowIdx = Array.from(tableEl.querySelectorAll('tr')).indexOf(tr)
+  const colIdx = Array.from(tr.querySelectorAll('th,td')).indexOf(cell)
+  const ord = Array.from(root.querySelectorAll('table.lsp-mdt')).indexOf(tableEl)
+  const rowCount = tableEl.querySelectorAll('tr').length
+  const colCount = tr.querySelectorAll('th,td').length
+  const L = opts.menuLabels || {}
+
+  const items = [
+    { icon: ICONS.insertRowAbove, label: L.insertRowAbove || 'Insert row above', enabled: rowIdx >= 1,
+      run: m => tableOps.insertRowAbove(m, rowIdx) },
+    { icon: ICONS.insertRowBelow, label: L.insertRowBelow || 'Insert row below', enabled: true,
+      run: m => tableOps.insertRowBelow(m, rowIdx) },
+    { icon: ICONS.deleteRow, label: L.deleteRow || 'Delete row', enabled: rowCount >= 2,
+      run: m => tableOps.deleteRow(m, rowIdx) },
+    { sep: true },
+    { icon: ICONS.insertColLeft, label: L.insertColLeft || 'Insert column left', enabled: true,
+      run: m => tableOps.insertColLeft(m, rowIdx, colIdx) },
+    { icon: ICONS.insertColRight, label: L.insertColRight || 'Insert column right', enabled: true,
+      run: m => tableOps.insertColRight(m, rowIdx, colIdx) },
+    { icon: ICONS.deleteCol, label: L.deleteCol || 'Delete column', enabled: colCount >= 2,
+      run: m => tableOps.deleteCol(m, rowIdx, colIdx) }
+  ]
+
+  const menu = doc.createElement('div')
+  menu.className = 'lsp-mdt-menu'
+  items.forEach(it => {
+    if (it.sep) { const s = doc.createElement('div'); s.className = 'lsp-mdt-menu-sep'; menu.appendChild(s); return }
+    const mi = doc.createElement('div')
+    mi.className = 'lsp-mdt-menu-item' + (it.enabled ? '' : ' disabled')
+    const ic = doc.createElement('span')
+    ic.className = 'lsp-mdt-menu-icon'
+    ic.innerHTML = it.icon || ''
+    const lb = doc.createElement('span')
+    lb.textContent = it.label
+    mi.appendChild(ic)
+    mi.appendChild(lb)
+    if (it.enabled) {
+      mi.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation()
+        closeMenu(doc)
+        commitStructural(root, opts, (m, i) => (i === ord ? it.run(m) : m))
+      })
+    }
+    menu.appendChild(mi)
+  })
+
+  // Off-screen first so we can measure, then clamp into the viewport.
+  menu.style.left = '-9999px'
+  menu.style.top = '-9999px'
+  doc.body.appendChild(menu)
+  const mw = menu.offsetWidth, mh = menu.offsetHeight
+  const vw = doc.documentElement.clientWidth, vh = doc.documentElement.clientHeight
+  menu.style.left = Math.max(4, Math.min(ev.clientX, vw - mw - 4)) + 'px'
+  menu.style.top = Math.max(4, Math.min(ev.clientY, vh - mh - 4)) + 'px'
+
+  const onDocPointer = (e) => { if (!menu.contains(e.target)) closeMenu(doc) }
+  const onKey = (e) => { if (e.key === 'Escape') closeMenu(doc) }
+  const onGone = () => closeMenu(doc)
+  doc.addEventListener('pointerdown', onDocPointer, true)
+  doc.addEventListener('keydown', onKey, true)
+  win.addEventListener('blur', onGone)
+  win.addEventListener('resize', onGone)
+  doc.addEventListener('scroll', onGone, true)
+  menu._cleanup = () => {
+    doc.removeEventListener('pointerdown', onDocPointer, true)
+    doc.removeEventListener('keydown', onKey, true)
+    win.removeEventListener('blur', onGone)
+    win.removeEventListener('resize', onGone)
+    doc.removeEventListener('scroll', onGone, true)
+  }
 }
 
 // Attach editing behaviour to a freshly-rendered renderer root. Idempotent:
@@ -195,6 +334,16 @@ export const attachInlineEditing = (root, opts) => {
     if (!e.target.closest('table.lsp-mdt th, table.lsp-mdt td')) return
     scheduleSave(root, opts)
   })
+
+  // Custom right-click menu (row/column ops). preventDefault so neither
+  // Logseq's nor Electron's native menu opens over the table.
+  root.addEventListener('contextmenu', (e) => {
+    const cell = e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (!cell) return
+    e.preventDefault()
+    e.stopPropagation()
+    openContextMenu(root, opts, cell, e)
+  }, true)
 }
 
 // Called when the renderer for a block is torn down / re-created so a pending

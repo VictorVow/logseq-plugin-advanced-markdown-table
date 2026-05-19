@@ -206,6 +206,37 @@ if (isInBrowser) {
             background: var(--ls-tertiary-background-color);
             color: var(--ls-primary-text-color);
           }
+          .lsp-mdt-menu {
+            position: fixed; z-index: 2147483647; min-width: 168px;
+            padding: 4px; border-radius: 6px;
+            border: 1px solid var(--ls-border-color);
+            background: var(--ls-secondary-background-color, #2b2b2b);
+            color: var(--ls-primary-text-color);
+            box-shadow: 0 6px 20px rgba(0,0,0,.35);
+            font-size: 13px; user-select: none;
+          }
+          .lsp-mdt-menu-item {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 10px; border-radius: 4px; cursor: pointer;
+            white-space: nowrap;
+          }
+          .lsp-mdt-menu-icon {
+            display: inline-flex; flex: 0 0 auto; line-height: 0;
+            opacity: .8;
+          }
+          .lsp-mdt-menu-icon svg { display: block; }
+          .lsp-mdt-menu-item:hover .lsp-mdt-menu-icon { opacity: 1; }
+          .lsp-mdt-menu-item:hover {
+            background: var(--ls-active-primary-color, #2563eb);
+            color: #fff;
+          }
+          .lsp-mdt-menu-item.disabled {
+            opacity: .4; cursor: default; pointer-events: none;
+          }
+          .lsp-mdt-menu-sep {
+            height: 1px; margin: 4px 6px;
+            background: var(--ls-border-color);
+          }
         `)
 
         logseq.Experiments.registerBlockRenderer('markdown-table-view', {
@@ -262,7 +293,15 @@ if (isInBrowser) {
                       segments,
                       blockId: id,
                       updateBlock: (b, c) => logseqEditor.updateBlock(b, c),
-                      debounceMs
+                      debounceMs,
+                      menuLabels: {
+                        insertRowAbove: i18n.t('Insert row above'),
+                        insertRowBelow: i18n.t('Insert row below'),
+                        deleteRow: i18n.t('Delete row'),
+                        insertColLeft: i18n.t('Insert column left'),
+                        insertColRight: i18n.t('Insert column right'),
+                        deleteCol: i18n.t('Delete column')
+                      }
                     })
                   }
                 }
