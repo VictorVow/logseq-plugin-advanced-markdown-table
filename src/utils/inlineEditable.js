@@ -206,6 +206,48 @@ export const moveCaretInFocusedTableCell = (direction) => {
   if (next) caretToEnd(next)
 }
 
+// Insert a row/column relative to the currently focused markdown-table
+// cell. `which` ∈ 'rowAbove' | 'rowBelow' | 'colLeft' | 'colRight'.
+// No-op if focus isn't in a cell, or if the op is invalid at this edge
+// (e.g. inserting a row above the header row).
+export const insertInFocusedTableCell = (which) => {
+  let hostDoc = null
+  try { hostDoc = (window.top || window.parent)?.document } catch (_) { /* cross-origin */ }
+  if (!hostDoc) return
+  const active = hostDoc.activeElement
+  const cell = active && active.closest && active.closest('table.lsp-mdt th, table.lsp-mdt td')
+  if (!cell) return
+  const root = cell.closest('.lsp-mdtable-renderer')
+  const opts = root && root._lspInlineOpts
+  if (!opts) return
+  doInsertOp(root, opts, cell, which)
+}
+
+// Shared by the local Alt+Shift+Arrow handler and the registered insert
+// commands. Stashes a `pendingToolbar` entry at the new cell's position
+// so `resumePinnedToolbar` refocuses it after the re-render (and re-pins
+// the toolbar if the user has it pinned).
+const doInsertOp = (root, opts, cell, which) => {
+  const tableEl = cell.closest('table.lsp-mdt')
+  const tr = cell.closest('tr')
+  const rowIdx = Array.from(tableEl.querySelectorAll('tr')).indexOf(tr)
+  const colIdx = Array.from(tr.querySelectorAll('th,td')).indexOf(cell)
+  const ord = Array.from(root.querySelectorAll('table.lsp-mdt')).indexOf(tableEl)
+  let op, newRow = rowIdx, newCol = colIdx
+  if (which === 'rowAbove') {
+    if (rowIdx < 1) return // header row has no "above"
+    op = tableOps.insertRowAbove; newRow = rowIdx
+  } else if (which === 'rowBelow') {
+    op = tableOps.insertRowBelow; newRow = rowIdx + 1
+  } else if (which === 'colLeft') {
+    op = tableOps.insertColLeft; newCol = colIdx
+  } else if (which === 'colRight') {
+    op = tableOps.insertColRight; newCol = colIdx + 1
+  } else return
+  pendingToolbar.set(opts.blockId, { ord, rowIdx: newRow, colIdx: newCol })
+  commitStructural(root, opts, (m, i) => (i === ord ? op(m, rowIdx, colIdx) : m))
+}
+
 const writeContent = (blockId, content, updateBlock) => {
   if (lastWritten.get(blockId) === content) return // nothing changed
   lastWritten.set(blockId, content)
@@ -757,6 +799,11 @@ export const attachInlineEditing = (root, opts) => {
     cell.spellcheck = false
   })
 
+  // Stashed every render (opts is rebuilt by the React ref each pass) so
+  // the globally-invoked insert helpers can recover the latest closures
+  // (updateBlock, segments, blockId) for whichever renderer holds focus.
+  root._lspInlineOpts = opts
+
   // Listeners are delegated on root; bind them only once per node.
   if (root.dataset.lspInlineEdit === '1') return
   root.dataset.lspInlineEdit = '1'
@@ -782,6 +829,28 @@ export const attachInlineEditing = (root, opts) => {
     if (!cell) return
     e.preventDefault(); e.stopPropagation()
     moveCaretInFocusedTableCell(e.shiftKey ? 'up' : 'down')
+  }, true)
+
+  // Alt+Shift+Arrow: insert a row above/below or a column left/right of
+  // the focused cell. Local handler for the same reason as Ctrl+Enter —
+  // capture-phase swallowing means Logseq never sees the key, so a
+  // global shortcut would be unreliable; the registered commands below
+  // mirror these actions for the palette / keymap UI.
+  const insertKey = (e) => {
+    if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return null
+    if (e.key === 'ArrowDown') return 'rowBelow'
+    if (e.key === 'ArrowUp') return 'rowAbove'
+    if (e.key === 'ArrowRight') return 'colRight'
+    if (e.key === 'ArrowLeft') return 'colLeft'
+    return null
+  }
+  root.addEventListener('keydown', (e) => {
+    const which = insertKey(e)
+    if (!which) return
+    const cell = e.target.closest && e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (!cell) return
+    e.preventDefault(); e.stopPropagation()
+    doInsertOp(root, opts, cell, which)
   }, true)
 
   // Force plain-text paste so markup can't smuggle structure into a cell.
@@ -831,15 +900,16 @@ export const attachInlineEditing = (root, opts) => {
   bindToolbarReflow(root.ownerDocument)
 }
 
-// After a pinned-toolbar action re-renders the block, refocus the cell at
-// the stashed position so the focus-driven toolbar reappears there. Called
-// from the renderer ref on every (re-)mount, so it works whether Logseq
-// reuses or replaces the root node.
+// After a structural action re-renders the block, refocus the cell at
+// the stashed position so the caret lands where the user expects (and,
+// if the toolbar is pinned, re-anchor it there too). Called from the
+// renderer ref on every (re-)mount, so it works whether Logseq reuses
+// or replaces the root node.
 export const resumePinnedToolbar = (root, opts) => {
   const pend = pendingToolbar.get(opts.blockId)
   if (!pend) return
-  if (!isPinned(opts)) { pendingToolbar.delete(opts.blockId); return }
   const win = root.ownerDocument.defaultView || window
+  const pinned = isPinned(opts)
   // Try this render; if the table isn't resolvable yet (stale/intermediate
   // render), keep `pend` so a later render retries instead of burning it.
   const tryShow = (retry) => {
@@ -854,8 +924,8 @@ export const resumePinnedToolbar = (root, opts) => {
       return
     }
     pendingToolbar.delete(opts.blockId)
-    buildToolbar(root, opts, cell) // build directly — don't depend on focus
-    caretToEnd(cell)              // caret continuity for the next op
+    if (pinned) buildToolbar(root, opts, cell) // build directly — don't depend on focus
+    caretToEnd(cell)                            // caret continuity for the next op
   }
   win.requestAnimationFrame(() => tryShow(3))
 }

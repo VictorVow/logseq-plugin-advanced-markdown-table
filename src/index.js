@@ -3,7 +3,7 @@ import '@logseq/libs'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
-import { attachInlineEditing, moveCaretInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
+import { attachInlineEditing, insertInFocusedTableCell, moveCaretInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
 import i18n from './locales/i18n'
 import './index.css'
 
@@ -141,6 +141,28 @@ if (isInBrowser) {
         key: 'mdtable-move-caret-up',
         label: i18n.t('Markdown table: move caret to cell above')
       }, () => moveCaretInFocusedTableCell('up'))
+
+      // Row/column insertion. Default Alt+Shift+Arrow keys are wired up
+      // by a local handler in `attachInlineEditing` (see Ctrl+Enter
+      // comment for why the local path is needed); these palette entries
+      // mirror those actions so they show up in Logseq's keymap UI and
+      // can be invoked from the command palette.
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-insert-row-below',
+        label: i18n.t('Markdown table: insert row below')
+      }, () => insertInFocusedTableCell('rowBelow'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-insert-row-above',
+        label: i18n.t('Markdown table: insert row above')
+      }, () => insertInFocusedTableCell('rowAbove'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-insert-col-right',
+        label: i18n.t('Markdown table: insert column right')
+      }, () => insertInFocusedTableCell('colRight'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-insert-col-left',
+        label: i18n.t('Markdown table: insert column left')
+      }, () => insertInFocusedTableCell('colLeft'))
 
       // Inline block renderer: replace Logseq's native view for markdown-table
       // blocks with an editable table. Host-mounted via the experimental
