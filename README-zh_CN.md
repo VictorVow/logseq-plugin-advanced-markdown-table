@@ -17,7 +17,7 @@
 
 ## 开发
 ```shell
-$ yarn
+$ npm install
 
-$ yarn start
+$ npm start
 ```

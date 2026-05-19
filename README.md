@@ -20,7 +20,7 @@ reference[https://codesandbox.io/s/yt8jc](https://codesandbox.io/s/yt8jc)
 
 ## Development
 ```shell
-$ yarn
+$ npm install
 
-$ yarn start
+$ npm start
 ```
