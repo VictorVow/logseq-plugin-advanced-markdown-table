@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react'
 import { Button } from 'antd'
-import { PlusOutlined, DragOutlined } from '@ant-design/icons'
+import { PlusOutlined, DragOutlined, FullscreenOutlined, FullscreenExitOutlined } from '@ant-design/icons'
 
 import TableEditor from '../components/TableEditor'
 import { slateValueToString } from '../utils/util'
@@ -24,6 +24,8 @@ const App = ({ content, tables, blockId }) => {
   const [position, setPosition] = useState({ x: 0, y: 0 })
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
+
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const setTableEditorRef = (index, dom) => {
     tableEditorMapRef.current = {
@@ -137,25 +139,30 @@ const App = ({ content, tables, blockId }) => {
     <div className="w-screen h-screen flex flex-col justify-center items-center">
       <div className="w-screen h-screen absolute" style={{ background: 'rgba(0, 0, 0, .3)', zIndex: -1 }} onClick={onClickCancel}></div>
       <div
-        className="w-2/3 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-lg"
-        style={{
-          maxHeight: '80%',
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          cursor: isDragging ? 'grabbing' : 'default'
-        }}
+        className={`flex flex-col bg-white dark:bg-gray-800 ${isFullscreen ? 'w-screen h-screen' : 'w-2/3 rounded-lg shadow-lg'}`}
+        style={isFullscreen
+          ? { maxHeight: '100%', height: '100%', width: '100%' }
+          : {
+              maxHeight: '80%',
+              transform: `translate(${position.x}px, ${position.y}px)`,
+              cursor: isDragging ? 'grabbing' : 'default'
+            }
+        }
       >
         {/* Draggable Header */}
-        <div
-          className="flex items-center justify-center py-2 px-4 bg-gray-100 dark:bg-gray-900 rounded-t-lg border-b border-gray-200 dark:border-gray-700"
-          style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-          onMouseDown={handleMouseDown}
-        >
-          <DragOutlined className="text-gray-500 dark:text-gray-400 mr-2" />
-          <span className="text-gray-600 dark:text-gray-300 text-sm select-none">{t('Drag to move')}</span>
-        </div>
+        {!isFullscreen && (
+          <div
+            className="flex items-center justify-center py-2 px-4 bg-gray-100 dark:bg-gray-900 rounded-t-lg border-b border-gray-200 dark:border-gray-700"
+            style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+            onMouseDown={handleMouseDown}
+          >
+            <DragOutlined className="text-gray-500 dark:text-gray-400 mr-2" />
+            <span className="text-gray-600 dark:text-gray-300 text-sm select-none">{t('Drag to move')}</span>
+          </div>
+        )}
 
         {/* Table Content */}
-        <div className="overflow-y-auto p-4" style={{ maxHeight: 'calc(80vh - 120px)' }}>
+        <div className="overflow-y-auto p-4" style={{ maxHeight: isFullscreen ? 'calc(100vh - 64px)' : 'calc(80vh - 120px)' }}>
           <div className="flex flex-col">
             {
               arrAfterSplitByTable?.map((node, index) => {
@@ -169,7 +176,14 @@ const App = ({ content, tables, blockId }) => {
 
         {/* Footer Actions */}
         <div className="flex items-center justify-between p-3 border-t border-gray-200 dark:border-gray-700">
-          <Button ghost className="rounded flex items-center" icon={<PlusOutlined />} onClick={onClickAdd}>{t('Add New Table')}</Button>
+          <div className="flex items-center">
+            <Button
+              className="mr-2 rounded flex items-center"
+              icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+              onClick={() => setIsFullscreen(v => !v)}
+            >{isFullscreen ? t('Exit full screen') : t('Full screen')}</Button>
+            <Button ghost className="rounded flex items-center" icon={<PlusOutlined />} onClick={onClickAdd}>{t('Add New Table')}</Button>
+          </div>
           <div className="flex flex-row">
             <Button className="mr-1 rounded" onClick={onClickCancel}>{t('Cancel')}</Button>
             <Button className="rounded" type="primary" onClick={onClickConfirm}>{t('Confirm')}</Button>
