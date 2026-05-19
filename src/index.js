@@ -122,14 +122,20 @@ if (isInBrowser) {
       const hasBlockRenderer = typeof logseq.Experiments?.registerBlockRenderer === 'function'
       if (inlineEnabled && hasBlockRenderer) {
         logseq.provideStyle(`
-          .lsp-mdtable-renderer { margin: 4px 0; }
+          .lsp-mdtable-renderer { margin: 4px 0; max-width: 100%; }
+          .lsp-mdtable-renderer .lsp-mdtable-scroll {
+            display: block; width: 100%; max-width: 100%;
+            overflow-x: auto; overflow-y: hidden;
+          }
           .lsp-mdtable-renderer table {
-            border-collapse: collapse; width: 100%;
+            border-collapse: collapse;
+            width: max-content !important; max-width: none !important;
             color: var(--ls-primary-text-color);
           }
           .lsp-mdtable-renderer th, .lsp-mdtable-renderer td {
             border: 1px solid var(--ls-border-color); padding: 4px 8px;
-            text-align: left; vertical-align: top; white-space: pre-wrap;
+            text-align: left !important; vertical-align: top !important;
+            white-space: pre;
           }
           .lsp-mdtable-renderer th { background: var(--ls-secondary-background-color); }
           .lsp-mdtable-renderer .lsp-mdtable-text { white-space: pre-wrap; opacity: .85; }
@@ -161,15 +167,17 @@ if (isInBrowser) {
               }
               const matrix = markdownTableToMatrix(seg.str)
               const [head = [], ...body] = matrix
-              return React.createElement('table', { key: 's' + si }, [
-                React.createElement('thead', { key: 'h' },
-                  React.createElement('tr', null,
-                    head.map((c, i) => React.createElement('th', { key: i }, c)))),
-                React.createElement('tbody', { key: 'b' },
-                  body.map((row, ri) => React.createElement('tr', { key: ri },
-                    head.map((_, ci) =>
-                      React.createElement('td', { key: ci }, row[ci] ?? '')))))
-              ])
+              return React.createElement('div',
+                { key: 's' + si, className: 'lsp-mdtable-scroll' },
+                React.createElement('table', null, [
+                  React.createElement('thead', { key: 'h' },
+                    React.createElement('tr', null,
+                      head.map((c, i) => React.createElement('th', { key: i }, c)))),
+                  React.createElement('tbody', { key: 'b' },
+                    body.map((row, ri) => React.createElement('tr', { key: ri },
+                      head.map((_, ci) =>
+                        React.createElement('td', { key: ci }, row[ci] ?? '')))))
+                ]))
             })
             children.push(React.createElement('button', {
               key: 'edit',
