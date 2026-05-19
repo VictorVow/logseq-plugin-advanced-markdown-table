@@ -148,8 +148,58 @@ if (isInBrowser) {
         }
       }
 
+      // Slash command: insert a minimal 1x1 markdown table into the current
+      // block. The inline renderer's `when` predicate (looksLikeMarkdownTable)
+      // picks it up automatically, so the block immediately switches to the
+      // custom table view — no modal, no extra clicks.
+      const insertEmptyTableCallback = async (e) => {
+        // Minimal 1x1 markdown table: one header cell + one body cell. The
+        // empty header looks odd but is required — a markdown table without
+        // a header/separator row isn't recognised by parseMarkdownTable.
+        const emptyTable = '|   |\n|---|\n|   |'
+        try {
+          const block = e?.uuid ? await logseqEditor.getBlock(e.uuid) : null
+          if (block && (block.format ?? 'markdown') !== 'markdown') {
+            return logseq.UI.showMsg(i18n.t('Markdown table editor only support markdown'), 'warning')
+          }
+          if (!block?.uuid) return
+          await logseqEditor.updateBlock(block.uuid, emptyTable)
+          // Exit edit mode so the inline renderer takes over instead of
+          // showing the raw markdown in Logseq's editing textarea.
+          try { await logseqEditor.exitEditingMode?.() } catch (_) { /* noop */ }
+
+          // Wait for the renderer to mount, then drop the caret into the
+          // first body cell so the user can start typing immediately.
+          let hostDoc = null
+          try { hostDoc = (window.top || window.parent)?.document } catch (_) { /* cross-origin */ }
+          if (!hostDoc) return
+          const selector = `.lsp-mdtable-renderer[data-blockid="${CSS.escape(String(block.uuid))}"] table.lsp-mdt tbody td`
+          const deadline = Date.now() + 2000
+          const tryFocus = () => {
+            const cell = hostDoc.querySelector(selector)
+            if (cell) {
+              cell.focus()
+              try {
+                const win = hostDoc.defaultView || window
+                const range = hostDoc.createRange()
+                range.selectNodeContents(cell)
+                range.collapse(true)
+                const sel = win.getSelection()
+                sel.removeAllRanges()
+                sel.addRange(range)
+              } catch (_) { /* noop */ }
+              return
+            }
+            if (Date.now() < deadline) requestAnimationFrame(tryFocus)
+          }
+          requestAnimationFrame(tryFocus)
+        } catch (err) {
+          console.error('[markdown-table-editor] insert empty table failed', err)
+        }
+      }
+
       logseqEditor.registerBlockContextMenuItem(i18n.t('Markdown Table Editor'), commandCallback)
-      logseqEditor.registerSlashCommand('Markdown Table Editor', commandCallback)
+      logseqEditor.registerSlashCommand('Markdown Table Editor', insertEmptyTableCallback)
 
       // Inline block renderer: replace Logseq's native view for markdown-table
       // blocks with a read-only table + Edit button. Host-mounted via the
@@ -353,6 +403,7 @@ if (isInBrowser) {
             return React.createElement('div',
               {
                 className: 'lsp-mdtable-renderer',
+                'data-blockid': String(id),
                 ref: (el) => {
                   if (!el) return
                   prepareInlineRenderer(el)
