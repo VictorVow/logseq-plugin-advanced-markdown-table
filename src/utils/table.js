@@ -156,6 +156,33 @@ export class TableUtil {
     });
   };
 
+  // Pad every cell to a uniform per-column width (with " x " framing) so the
+  // saved markdown source is an aligned, human-readable grid.
+  readable = () => {
+    const [tableNode] = Editor.nodes(this.editor, {
+      at: [],
+      match: (n) =>
+        !Editor.isEditor(n) && Element.isElement(n) && n.type === "table",
+      mode: "highest"
+    });
+    if (!tableNode) return;
+    const [oldTable, path] = tableNode;
+    const rows = Array.from(oldTable.children, (row) =>
+      Array.from(row.children, (cell) =>
+        String(cell.children?.[0]?.text ?? '').trim())
+    );
+    const colCount = Math.max(...rows.map((r) => r.length));
+    const widths = [];
+    for (let c = 0; c < colCount; c++) {
+      widths[c] = Math.max(3, ...rows.map((r) => (r[c] ?? '').length));
+    }
+    const padded = rows.map((r) =>
+      Array.from({ length: colCount }, (_, c) => ` ${(r[c] ?? '').padEnd(widths[c])} `)
+    );
+    Transforms.removeNodes(this.editor, { at: path });
+    Transforms.insertNodes(this.editor, createTableNode(padded), { at: path });
+  };
+
   moveCursor = (tableNode, selection, action = 'cursor-next') => {
     const { focus } = selection
     const cursorPosition = { row: focus?.path[1], column: focus?.path[2] }

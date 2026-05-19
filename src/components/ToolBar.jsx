@@ -1,5 +1,5 @@
 import { useSlate } from 'slate-react'
-import { InsertRowAboveOutlined, InsertRowBelowOutlined, InsertRowLeftOutlined, InsertRowRightOutlined, DeleteRowOutlined, DeleteColumnOutlined, ClearOutlined } from '@ant-design/icons'
+import { InsertRowAboveOutlined, InsertRowBelowOutlined, InsertRowLeftOutlined, InsertRowRightOutlined, DeleteRowOutlined, DeleteColumnOutlined, ClearOutlined, ColumnWidthOutlined } from '@ant-design/icons'
 import { Tooltip } from 'antd'
 import { useTranslation } from 'react-i18next'
 
@@ -19,6 +19,11 @@ const ToolBar = () => {
   const handleNormalize = (e) => {
     e.preventDefault()
     table.normalize()
+  }
+
+  const handleReadable = (e) => {
+    e.preventDefault()
+    table.readable()
   }
 
   return (
@@ -49,6 +54,9 @@ const ToolBar = () => {
 
       <Tooltip title={t('normalise data')} arrowPointAtCenter placement="topLeft">
         <ClearOutlined className="text-xl cursor-pointer hover:opacity-70" onMouseDown={handleNormalize} />
+      </Tooltip>
+      <Tooltip title={t('readable data')} arrowPointAtCenter placement="topLeft">
+        <ColumnWidthOutlined className="text-xl cursor-pointer hover:opacity-70" onMouseDown={handleReadable} />
       </Tooltip>
 
     </div>

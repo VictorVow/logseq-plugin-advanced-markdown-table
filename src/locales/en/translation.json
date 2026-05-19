@@ -11,6 +11,7 @@
   "insert column after": "insert column after",
   "delete column": "delete column",
   "normalise data": "normalise data (trim whitespace in cells)",
+  "readable data": "readable data (align table source)",
   "uuid error": "uuid error",
   "markdown table overwrite success": "markdown table overwrite success",
   "markdown table overwrite error": "markdown table overwrite error",

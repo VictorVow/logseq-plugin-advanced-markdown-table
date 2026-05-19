@@ -20,7 +20,18 @@ export const slateValueToString = (slateVal) => {
     }).join('|')
     return `|${cells}|`
   })
-  rowStrs.splice(1, 0, `|${Array.from(slateVal.children[0].children, () => '--').join('|')}|`)
+  // Default separator is unchanged ('--' per column). Only when the "readable"
+  // action has space-framed the cells (" x ") do we size the separator dashes
+  // to match, so the alignment applies solely to the table the user ran
+  // "readable data" on — every other save serializes exactly as before.
+  const sep = Array.from(slateVal.children[0].children, (cell) => {
+    const s = String(cell.children[0].text ?? '').replaceAll('\n', '[:br]')
+    if (s.length >= 4 && s.startsWith(' ') && s.endsWith(' ')) {
+      return ` ${'-'.repeat(s.length - 2)} `
+    }
+    return '--'
+  }).join('|')
+  rowStrs.splice(1, 0, `|${sep}|`)
   return rowStrs.join('\n')
 }
 
