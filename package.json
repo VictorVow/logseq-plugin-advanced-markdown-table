@@ -11,9 +11,9 @@
     "icon": "./logo.png"
   },
   "scripts": {
-    "start": "cross-env REACT_APP_ENV=browser node scripts/start.js",
-    "build": "node scripts/build.js",
-    "test": "cross-env REACT_APP_ENV=browser node scripts/test.js"
+    "start": "cross-env NODE_OPTIONS=--openssl-legacy-provider REACT_APP_ENV=browser node scripts/start.js",
+    "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider node scripts/build.js",
+    "test": "cross-env NODE_OPTIONS=--openssl-legacy-provider REACT_APP_ENV=browser node scripts/test.js"
   },
   "dependencies": {
     "@ant-design/icons": "^4.7.0",
