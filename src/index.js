@@ -207,36 +207,34 @@ if (isInBrowser) {
             color: var(--ls-primary-text-color);
           }
           .lsp-mdtable-renderer .lsp-mdtable-fullscreen { margin-left: 6px; }
-          /* Full-screen view: pin the renderer to the viewport with a solid
-             surface background and roomy padding so the table reads more like
-             a document than an inline block. The inner scroll wrapper takes
-             the remaining height so wide tables still scroll horizontally
-             and tall ones scroll vertically. */
-          .lsp-mdtable-renderer.lsp-mdt-fs {
-            position: fixed; inset: 0; z-index: 2147483646;
+          /* Full-screen view uses the browser's native Fullscreen API so
+             the element overlays Logseq's UI regardless of ancestor
+             stacking/transform contexts (a plain position:fixed gets
+             clipped because Logseq's block element creates a containing
+             block). The DOM doesn't move, so inline editing, the toolbar,
+             drag-drop, and right-click menus all keep working. */
+          .lsp-mdtable-renderer:fullscreen {
             margin: 0; padding: 24px 32px;
             background: var(--ls-primary-background-color, #fff);
             display: flex; flex-direction: column; gap: 8px;
-            overflow: auto;
+            overflow: auto; box-sizing: border-box;
           }
-          .lsp-mdtable-renderer.lsp-mdt-fs .lsp-mdtable-scroll {
+          .lsp-mdtable-renderer:fullscreen .lsp-mdtable-scroll {
             flex: 1 1 auto; min-height: 0; overflow: auto;
           }
-          .lsp-mdtable-renderer.lsp-mdt-fs table.lsp-mdt th,
-          .lsp-mdtable-renderer.lsp-mdt-fs table.lsp-mdt td {
+          .lsp-mdtable-renderer:fullscreen table.lsp-mdt th,
+          .lsp-mdtable-renderer:fullscreen table.lsp-mdt td {
             padding: 8px 12px !important; font-size: 14px;
           }
-          .lsp-mdtable-renderer.lsp-mdt-fs .lsp-mdtable-text {
-            font-size: 14px;
-          }
+          .lsp-mdtable-renderer:fullscreen .lsp-mdtable-text { font-size: 14px; }
           .lsp-mdtable-renderer .lsp-mdtable-fs-bar { display: none; }
-          .lsp-mdtable-renderer.lsp-mdt-fs .lsp-mdtable-fs-bar {
+          .lsp-mdtable-renderer:fullscreen .lsp-mdtable-fs-bar {
             display: flex; align-items: center; justify-content: flex-end;
             gap: 6px; flex: 0 0 auto;
           }
-          /* Hide the inline Edit / Full screen buttons while in full screen:
+          /* Hide the inline Edit / Full screen buttons while full screen;
              the exit button in the top bar takes their place. */
-          .lsp-mdtable-renderer.lsp-mdt-fs > .lsp-mdtable-edit { display: none; }
+          .lsp-mdtable-renderer:fullscreen > .lsp-mdtable-edit { display: none; }
           .lsp-mdt-menu {
             position: fixed; z-index: 2147483647; min-width: 168px;
             padding: 4px; border-radius: 6px;
@@ -360,34 +358,25 @@ if (isInBrowser) {
               className: 'lsp-mdtable-edit',
               onClick: () => commandCallback({ uuid: id }) // existing modal flow
             }, i18n.t('Edit table')))
-            // Full-screen view: render the inline table itself in full screen
-            // (no modal). Click toggles a class on the renderer root; an
-            // Escape keydown also exits. While in full screen, an exit button
-            // is shown in the top bar (the inline button is hidden by CSS).
-            const enterFullscreen = (rootEl) => {
-              if (!rootEl || rootEl.classList.contains('lsp-mdt-fs')) return
-              rootEl.classList.add('lsp-mdt-fs')
-              const exitBtn = rootEl.querySelector('.lsp-mdtable-fs-exit')
-              if (exitBtn) exitBtn.textContent = i18n.t('Exit full screen')
-              const onKey = (ev) => {
-                if (ev.key === 'Escape') { ev.stopPropagation(); exitFullscreen(rootEl) }
-              }
-              rootEl._lspFsKey = onKey
-              document.addEventListener('keydown', onKey, true)
-            }
-            const exitFullscreen = (rootEl) => {
-              if (!rootEl || !rootEl.classList.contains('lsp-mdt-fs')) return
-              rootEl.classList.remove('lsp-mdt-fs')
-              if (rootEl._lspFsKey) {
-                document.removeEventListener('keydown', rootEl._lspFsKey, true)
-                rootEl._lspFsKey = null
-              }
-            }
+            // Full-screen view: use the native Fullscreen API on the
+            // renderer element. The DOM doesn't move so all inline editing
+            // hooks remain bound; the browser handles Escape and click
+            // semantics for us. We just need to keep our button label in
+            // sync via the fullscreenchange event.
             const onFsClick = (e) => {
               const root = e.currentTarget.closest('.lsp-mdtable-renderer')
               if (!root) return
-              if (root.classList.contains('lsp-mdt-fs')) exitFullscreen(root)
-              else enterFullscreen(root)
+              const doc = root.ownerDocument
+              const fsEl = doc.fullscreenElement || doc.webkitFullscreenElement
+              try {
+                if (fsEl === root) {
+                  (doc.exitFullscreen || doc.webkitExitFullscreen).call(doc)
+                } else {
+                  (root.requestFullscreen || root.webkitRequestFullscreen).call(root)
+                }
+              } catch (err) {
+                console.warn('[mdtable] fullscreen toggle failed', err)
+              }
             }
             // Top bar lives at the start of the renderer so the exit button
             // sits in a consistent place when full screen is active. It's
@@ -413,6 +402,24 @@ if (isInBrowser) {
                 ref: (el) => {
                   if (!el) return
                   prepareInlineRenderer(el)
+                  // Keep the Full screen / Exit full screen labels in sync
+                  // with the actual fullscreen state (the user can press
+                  // Escape, which the API handles for us — we just relabel).
+                  if (!el._lspFsBound) {
+                    el._lspFsBound = true
+                    const sync = () => {
+                      const doc = el.ownerDocument
+                      const fsEl = doc.fullscreenElement || doc.webkitFullscreenElement
+                      const active = fsEl === el
+                      const enter = el.querySelector(':scope > .lsp-mdtable-fullscreen')
+                      const exit = el.querySelector('.lsp-mdtable-fs-exit')
+                      if (enter) enter.textContent = active ? i18n.t('Exit full screen') : i18n.t('Full screen')
+                      if (exit) exit.textContent = i18n.t('Exit full screen')
+                    }
+                    const doc = el.ownerDocument
+                    doc.addEventListener('fullscreenchange', sync)
+                    doc.addEventListener('webkitfullscreenchange', sync)
+                  }
                   if (editable) {
                     const inlineOpts = {
                       segments,
