@@ -1,15 +1,9 @@
 import '@logseq/libs'
-import React from 'react'
-import ReactDOM from 'react-dom'
-import 'antd/dist/antd.css'
 
-import App from './pages/App'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
 import { attachInlineEditing, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
-// import { multipleTables, empty, longTables, onlyText, tableWithTextBeforeAndAfter } from './utils/testExample'
-import { longTables } from './utils/testExample'
 import i18n from './locales/i18n'
 import './index.css'
 
@@ -27,25 +21,18 @@ const applyTheme = (mode) => {
 // Settings schema
 const settingsSchema = [
   {
-    key: 'keyboardShortcut',
-    type: 'string',
-    default: 'mod+shift+t',
-    title: 'Keyboard Shortcut',
-    description: 'Keyboard shortcut to open the table editor. Use "mod" for Cmd (Mac) or Ctrl (Windows/Linux). Examples: mod+shift+t, ctrl+alt+t, mod+e'
-  },
-  {
     key: 'enableInlineRenderer',
     type: 'boolean',
     default: true,
     title: 'Inline table rendering',
-    description: "Render markdown-table blocks inline as tables (replacing Logseq's native outline view), with an Edit button. Requires a Logseq version that supports the experimental block renderer API; ignored on older versions. Reload the plugin after changing this."
+    description: "Render markdown-table blocks inline as tables (replacing Logseq's native outline view). Requires a Logseq version that supports the experimental block renderer API; ignored on older versions. Reload the plugin after changing this."
   },
   {
     key: 'inlineEditable',
     type: 'boolean',
     default: true,
     title: 'Edit inline tables in place',
-    description: "Make the inline-rendered table's cells editable directly (debounced auto-save back to the block). When off, the inline table is read-only and edits go through the modal editor's \"Edit table\" button. Requires \"Inline table rendering\". Reload the plugin after changing this."
+    description: "Make the inline-rendered table's cells editable directly (debounced auto-save back to the block). When off, the inline table is read-only. Requires \"Inline table rendering\". Reload the plugin after changing this."
   },
   {
     key: 'inlineEditDebounceMs',
@@ -53,13 +40,6 @@ const settingsSchema = [
     default: 500,
     title: 'Inline edit auto-save delay (ms)',
     description: 'How long after you stop typing in an inline table cell before the change is written back to the block. Reload the plugin after changing this.'
-  },
-  {
-    key: 'nativeTableEditButton',
-    type: 'boolean',
-    default: true,
-    title: 'Native table edit button',
-    description: "Show an \"Edit Markdown Table\" button (top-left, on hover) over Logseq's natively-rendered markdown tables; clicking opens the table editor. Reload the plugin after changing this."
   },
   {
     key: 'monospaceTableSource',
@@ -77,17 +57,11 @@ const settingsSchema = [
   }
 ]
 
-const bootEditor = (input, blockId) => {
-  console.log('[faiz:] === Raw Input: \n', input)
-  let tables = parseMarkdownTable(input)
-  console.log('[faiz:] === markdownIt parse res', tables)
-  renderApp(input, tables, blockId)
-}
-
 if (isInBrowser) {
+  // Browser dev mode previously booted the (now-removed) modal editor; with
+  // only the inline renderer left, there's nothing standalone to mount.
   applyTheme(window.matchMedia &&
     window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
-  bootEditor(longTables, 111)
 } else {
   logseq.useSettingsSchema(settingsSchema)
 
@@ -98,60 +72,12 @@ if (isInBrowser) {
       if (typeof logseq.App.onThemeModeChanged === 'function') {
         logseq.App.onThemeModeChanged(({ mode }) => applyTheme(mode))
       }
-      // padding-left: var(--ls-left-sidebar-width);
-      logseq.provideStyle(`
-        iframe#logseq-markdown-table.lsp-iframe-sandbox {
-          z-index: 10;
-        }
-      `)
       console.log('[faiz:] === markdown-table-editor-plugin loaded')
-      const commandCallback = (e) => {
-        console.log('[faiz:] === woz-markdown-table-editor', e)
-        logseqEditor.getBlock(e.uuid).then(block => {
-          console.log('[faiz:] === block', block)
-          // @logseq/libs 0.3.3: block.content is deprecated in favour of block.title
-          const content = block.content ?? block.title ?? ''
-          // only support markdown (treat missing format as ok — DB-graph blocks may omit it)
-          if (block.format && block.format !== 'markdown') return logseq.UI.showMsg(i18n.t('Markdown table editor only support markdown'), 'warning')
-
-          bootEditor(content, e.uuid)
-
-          // for empty block
-          // todo: fix
-          // if (content === '') return renderApp(DEFAULT_TABLE, [], e.uuid)
-
-          // const tables = parseMarkdownTable(content)
-          // if (tables?.length > 0) {
-          //   // const [startLine, endLine] = tables[0]
-          //   // const firstTable = content.split('\n').slice(startLine, endLine).join('\n')
-          //   // console.log('[faiz:] === firstTable', content, firstTable, startLine, endLine)
-          //   // return renderApp(firstTable, e.uuid)
-          //   return renderApp(content, tables, e.uuid)
-          // }
-
-          // const renderHtml = md.render(content)
-          // if (renderHtml.startsWith('<table>') && (renderHtml.endsWith('</table>') || renderHtml.endsWith('</table>\n'))) {
-          //   return renderApp(content || DEFAULT_TABLE, e.uuid)
-          // }
-          // format to table error
-          // window.logseq.App.showMsg('Sorry, block content format to markdown table error', 'warning')
-          // console.log('[faiz:] === block content format to markdown table error')
-        })
-      }
-
-      const shortcutHandler = async () => {
-        const currentBlock = await logseqEditor.getCurrentBlock()
-        if (currentBlock) {
-          commandCallback({ uuid: currentBlock.uuid })
-        } else {
-          logseq.UI.showMsg(i18n.t('Please select a block first'), 'warning')
-        }
-      }
 
       // Slash command: insert a minimal 1x1 markdown table into the current
       // block. The inline renderer's `when` predicate (looksLikeMarkdownTable)
       // picks it up automatically, so the block immediately switches to the
-      // custom table view — no modal, no extra clicks.
+      // custom table view.
       const insertEmptyTableCallback = async (e) => {
         // Minimal 1x1 markdown table: one header cell + one body cell. The
         // empty header looks odd but is required — a markdown table without
@@ -198,12 +124,11 @@ if (isInBrowser) {
         }
       }
 
-      logseqEditor.registerBlockContextMenuItem(i18n.t('Markdown Table Editor'), commandCallback)
       logseqEditor.registerSlashCommand('Markdown Table Editor', insertEmptyTableCallback)
 
       // Inline block renderer: replace Logseq's native view for markdown-table
-      // blocks with a read-only table + Edit button. Host-mounted via the
-      // experimental Experiments API; a clean no-op on older Logseq hosts.
+      // blocks with an editable table. Host-mounted via the experimental
+      // Experiments API; a clean no-op on older Logseq hosts.
       const inlineEnabled = logseq.settings?.enableInlineRenderer !== false
       const hasBlockRenderer = typeof logseq.Experiments?.registerBlockRenderer === 'function'
       if (inlineEnabled && hasBlockRenderer) {
@@ -250,12 +175,6 @@ if (isInBrowser) {
             outline: 2px solid var(--ls-active-primary-color, #2563eb) !important;
             outline-offset: -2px;
           }
-          .lsp-mdtable-renderer .lsp-mdtable-edit {
-            margin-top: 6px; padding: 2px 10px; font-size: 12px; cursor: pointer;
-            border: 1px solid var(--ls-border-color); border-radius: 4px;
-            background: var(--ls-tertiary-background-color);
-            color: var(--ls-primary-text-color);
-          }
           /* Full-screen view uses the browser's native Fullscreen API so the
              element overlays Logseq's UI regardless of ancestor stacking /
              transform contexts. The DOM doesn't move, so inline editing,
@@ -272,8 +191,6 @@ if (isInBrowser) {
             padding: 8px 12px !important; font-size: 14px;
           }
           .lsp-mdtable-renderer:fullscreen .lsp-mdtable-text { font-size: 14px; }
-          /* The trailing Edit table button is meaningless in fullscreen. */
-          .lsp-mdtable-renderer:fullscreen > .lsp-mdtable-edit { display: none; }
           .lsp-mdt-menu {
             position: fixed; z-index: 2147483647; min-width: 168px;
             padding: 4px; border-radius: 6px;
@@ -392,11 +309,6 @@ if (isInBrowser) {
                         React.createElement('td', { key: ci, style: cellStyle }, row[ci] ?? '')))))
                 ]))
             })
-            children.push(React.createElement('button', {
-              key: 'edit',
-              className: 'lsp-mdtable-edit',
-              onClick: () => commandCallback({ uuid: id }) // existing modal flow
-            }, i18n.t('Edit table')))
             const editable = logseq.settings?.inlineEditable !== false
             const dbRaw = Number(logseq.settings?.inlineEditDebounceMs)
             const debounceMs = Number.isFinite(dbRaw) && dbRaw >= 0 ? dbRaw : 500
@@ -443,64 +355,6 @@ if (isInBrowser) {
         })
       }
 
-      // Native table edit button: overlay a hover "Edit Markdown Table"
-      // button on Logseq's natively-rendered markdown tables (host DOM).
-      const nativeBtnEnabled = logseq.settings?.nativeTableEditButton !== false
-      if (nativeBtnEnabled) {
-        logseq.provideStyle(`
-          .markdown-table { position: relative; }
-          .markdown-table .lsp-native-edit-btn {
-            position: absolute; top: 4px; left: 4px; z-index: 5;
-            opacity: 0; pointer-events: none; transition: opacity .12s;
-            display: inline-flex; align-items: center; justify-content: center;
-            padding: 4px; line-height: 0; cursor: pointer;
-            border: 1px solid var(--ls-border-color); border-radius: 4px;
-            background: var(--ls-secondary-background-color);
-            color: var(--ls-primary-text-color);
-          }
-          .markdown-table .lsp-native-edit-btn svg { display: block; }
-          .markdown-table:hover .lsp-native-edit-btn { opacity: 1; pointer-events: auto; }
-        `)
-
-        let hostDoc = null
-        try { hostDoc = (window.top || window.parent)?.document } catch (e) { /* cross-origin */ }
-        if (!hostDoc) {
-          console.warn('[mdtable] native edit button: host document not accessible; skipped')
-        } else {
-          const label = i18n.t('Edit Markdown Table')
-          const decorate = () => {
-            hostDoc.querySelectorAll('.markdown-table:not([data-lsp-edit])').forEach(wrap => {
-              wrap.dataset.lspEdit = '1'
-              const btn = hostDoc.createElement('button')
-              btn.className = 'lsp-native-edit-btn'
-              btn.type = 'button'
-              btn.title = label
-              btn.setAttribute('aria-label', label)
-              btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>'
-              btn.addEventListener('click', (ev) => {
-                ev.preventDefault(); ev.stopPropagation()
-                const blk = wrap.closest('.ls-block')
-                const uuid = blk && blk.getAttribute('blockid')
-                if (uuid) commandCallback({ uuid })
-                else logseq.UI.showMsg(i18n.t('uuid error'), 'warning')
-              })
-              wrap.prepend(btn)
-            })
-          }
-          decorate()
-          let scheduled = false
-          const obs = new MutationObserver(() => {
-            if (scheduled) return
-            scheduled = true
-            ;(hostDoc.defaultView || window).requestAnimationFrame(() => {
-              scheduled = false
-              decorate()
-            })
-          })
-          obs.observe(hostDoc.body, { childList: true, subtree: true })
-        }
-      }
-
       // Monospace table source when editing: while a block whose raw content
       // is a markdown table is being edited, render its <textarea> in a
       // monospace font so "readable data"-aligned tables actually line up
@@ -532,29 +386,6 @@ if (isInBrowser) {
           hostDoc2.addEventListener('input', (e) => applyMono(e.target), true)
         }
       }
-
-      // Register keyboard shortcut from settings
-      const shortcut = logseq.settings?.keyboardShortcut || 'mod+shift+t'
-      logseq.App.registerCommandShortcut(
-        { binding: shortcut },
-        shortcutHandler
-      )
-
-      logseq.on('ui:visible:changed', (e) => {
-        if (!e.visible) {
-          ReactDOM.unmountComponentAtNode(document.getElementById('root'));
-        }
-      });
     })
   })
-}
-
-function renderApp(content, tables, blockId) {
-  ReactDOM.render(
-    <React.StrictMode>
-      <App content={content} tables={tables} blockId={blockId} />
-    </React.StrictMode>,
-    document.getElementById('root')
-  )
-  if (!isInBrowser) logseq.showMainUI()
 }

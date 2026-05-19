@@ -16,7 +16,7 @@
 //     would break re-parsing (the parser splits naively on `|`). Cells are
 //     read via innerText (so Enter-inserted <div>/<br> normalise to \n) and
 //     sanitised: \r dropped, `|` neutralised, \n -> [:br] (the existing
-//     newline token, matching slateValueToString).
+//     newline token).
 
 const debounceTimers = new Map() // blockId -> timeout handle
 const lastWritten = new Map()    // blockId -> last content we wrote (echo guard)
@@ -110,9 +110,7 @@ export const prepareInlineRenderer = (root) => {
 }
 
 // Serialize one matrix (header row first, no delimiter row) to a markdown
-// table. Mirrors slateValueToString in utils/util.js, including the
-// "readable data" space-framed separator sizing, so an inline edit saves
-// byte-identically to a modal save of the same table.
+// table. Emits the "readable data" space-framed separator sizing.
 const serializeMatrix = (rows) => {
   const rowStrs = rows.map(cells => `|${cells.join('|')}|`)
   const sep = (rows[0] || []).map(s => {
