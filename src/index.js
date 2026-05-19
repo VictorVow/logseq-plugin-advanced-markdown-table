@@ -7,6 +7,7 @@ import App from './pages/App'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
+import { attachInlineEditing } from './utils/inlineEditable'
 // import { multipleTables, empty, longTables, onlyText, tableWithTextBeforeAndAfter } from './utils/testExample'
 import { longTables } from './utils/testExample'
 import i18n from './locales/i18n'
@@ -38,6 +39,20 @@ const settingsSchema = [
     default: true,
     title: 'Inline table rendering',
     description: "Render markdown-table blocks inline as tables (replacing Logseq's native outline view), with an Edit button. Requires a Logseq version that supports the experimental block renderer API; ignored on older versions. Reload the plugin after changing this."
+  },
+  {
+    key: 'inlineEditable',
+    type: 'boolean',
+    default: true,
+    title: 'Edit inline tables in place',
+    description: "Make the inline-rendered table's cells editable directly (debounced auto-save back to the block). When off, the inline table is read-only and edits go through the modal editor's \"Edit table\" button. Requires \"Inline table rendering\". Reload the plugin after changing this."
+  },
+  {
+    key: 'inlineEditDebounceMs',
+    type: 'number',
+    default: 500,
+    title: 'Inline edit auto-save delay (ms)',
+    description: 'How long after you stop typing in an inline table cell before the change is written back to the block. Reload the plugin after changing this.'
   },
   {
     key: 'nativeTableEditButton',
@@ -167,6 +182,15 @@ if (isInBrowser) {
             font-weight: 600 !important;
           }
           .lsp-mdtable-renderer .lsp-mdtable-text { white-space: pre-wrap; opacity: .85; }
+          .lsp-mdtable-renderer table.lsp-mdt th[contenteditable],
+          .lsp-mdtable-renderer table.lsp-mdt td[contenteditable] {
+            cursor: text;
+          }
+          .lsp-mdtable-renderer table.lsp-mdt th[contenteditable]:focus,
+          .lsp-mdtable-renderer table.lsp-mdt td[contenteditable]:focus {
+            outline: 2px solid var(--ls-active-primary-color, #2563eb) !important;
+            outline-offset: -2px;
+          }
           .lsp-mdtable-renderer .lsp-mdtable-edit {
             margin-top: 6px; padding: 2px 10px; font-size: 12px; cursor: pointer;
             border: 1px solid var(--ls-border-color); border-radius: 4px;
@@ -215,8 +239,23 @@ if (isInBrowser) {
               className: 'lsp-mdtable-edit',
               onClick: () => commandCallback({ uuid: id }) // existing modal flow
             }, i18n.t('Edit table')))
+            const editable = logseq.settings?.inlineEditable !== false
+            const dbRaw = Number(logseq.settings?.inlineEditDebounceMs)
+            const debounceMs = Number.isFinite(dbRaw) && dbRaw >= 0 ? dbRaw : 500
             return React.createElement('div',
-              { className: 'lsp-mdtable-renderer' }, children)
+              {
+                className: 'lsp-mdtable-renderer',
+                ref: (el) => {
+                  if (el && editable) {
+                    attachInlineEditing(el, {
+                      segments,
+                      blockId: id,
+                      updateBlock: (b, c) => logseqEditor.updateBlock(b, c),
+                      debounceMs
+                    })
+                  }
+                }
+              }, children)
           }
         })
       }
