@@ -276,10 +276,13 @@ const SVG = (body) =>
 const ICONS = {
   insertRowAbove: SVG('<polyline points="8 8 12 4 16 8"/><line x1="12" y1="4" x2="12" y2="13"/><rect x="4" y="17" width="16" height="4" rx="1"/>'),
   insertRowBelow: SVG('<rect x="4" y="3" width="16" height="4" rx="1"/><line x1="12" y1="11" x2="12" y2="20"/><polyline points="8 16 12 20 16 16"/>'),
-  deleteRow: SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'),
+  // deleteRow / deleteCol: SVGs adapted from tgrosinger/advanced-tables-obsidian
+  // (MIT). Filled icons with their original viewBoxes; the rest of ICONS use
+  // the stroked SVG() helper. https://github.com/tgrosinger/advanced-tables-obsidian
+  deleteRow: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 15.381 15.381" fill="currentColor"><path d="M0,1.732v7.732h6.053c0-0.035-0.004-0.07-0.004-0.104c0-0.434,0.061-0.854,0.165-1.255H1.36V3.092h12.662v2.192c0.546,0.396,1.01,0.897,1.359,1.477V1.732H0z"/><path d="m11.196 5.28c-2.307 0-4.183 1.877-4.183 4.184 0 2.308 1.876 4.185 4.183 4.185 2.309 0 4.185-1.877 4.185-4.185 0-2.307-1.876-4.184-4.185-4.184zm0 7.233c-1.679 0-3.047-1.367-3.047-3.049 0-1.68 1.368-3.049 3.047-3.049 1.684 0 3.05 1.369 3.05 3.049 0 1.682-1.366 3.049-3.05 3.049z"/><rect x="9.312" y="8.759" width="3.844" height="1.104"/></svg>',
   insertColLeft: SVG('<polyline points="8 8 4 12 8 16"/><line x1="4" y1="12" x2="13" y2="12"/><rect x="17" y="4" width="4" height="16" rx="1"/>'),
   insertColRight: SVG('<rect x="3" y="4" width="4" height="16" rx="1"/><line x1="11" y1="12" x2="20" y2="12"/><polyline points="16 8 20 12 16 16"/>'),
-  deleteCol: SVG('<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>'),
+  deleteCol: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 26 26" fill="currentColor"><path d="m13.594 20.85v3.15h-10v-22h10v3.15c0.633-0.323 1.304-0.565 2-0.727v-3.423c0-0.551-0.448-1-1-1h-12c-0.55 0-1 0.449-1 1v24c0 0.551 0.449 1 1 1h12c0.552 0 1-0.449 1-1v-3.424c-0.696-0.161-1.367-0.403-2-0.726z"/><path d="m17.594 6.188c-3.762 0-6.813 3.051-6.812 6.813-1e-3 3.761 3.05 6.812 6.812 6.812s6.813-3.051 6.813-6.813-3.052-6.812-6.813-6.812zm3.632 7.802-7.267 1e-3v-1.982h7.268l-1e-3 1.981z"/></svg>',
   moveRowUp:   SVG('<line x1="12" y1="20" x2="12" y2="5"/><polyline points="6 11 12 5 18 11"/>'),
   moveRowDown: SVG('<line x1="12" y1="4" x2="12" y2="19"/><polyline points="6 13 12 19 18 13"/>'),
   moveColLeft: SVG('<line x1="20" y1="12" x2="5" y2="12"/><polyline points="11 6 5 12 11 18"/>'),
