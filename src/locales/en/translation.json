@@ -14,5 +14,6 @@
   "markdown table overwrite success": "markdown table overwrite success",
   "markdown table overwrite error": "markdown table overwrite error",
   "Drag to move": "Drag to move",
-  "Please select a block first": "Please select a block first"
+  "Please select a block first": "Please select a block first",
+  "Edit table": "Edit table"
 }

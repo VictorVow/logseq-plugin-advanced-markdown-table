@@ -14,5 +14,6 @@
   "markdown table overwrite success": "markdown 表格覆盖成功",
   "markdown table overwrite error": "markdown 表格覆盖失败",
   "Drag to move": "拖动移动",
-  "Please select a block first": "请先选择一个 block"
+  "Please select a block first": "请先选择一个 block",
+  "Edit table": "编辑表格"
 }

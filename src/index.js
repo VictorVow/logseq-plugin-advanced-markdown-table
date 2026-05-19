@@ -5,6 +5,8 @@ import 'antd/dist/antd.css'
 
 import App from './pages/App'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
+import { splitStrByTable } from './utils/splitStrByTable'
+import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
 // import { multipleTables, empty, longTables, onlyText, tableWithTextBeforeAndAfter } from './utils/testExample'
 import { longTables } from './utils/testExample'
 import i18n from './locales/i18n'
@@ -29,6 +31,13 @@ const settingsSchema = [
     default: 'mod+shift+t',
     title: 'Keyboard Shortcut',
     description: 'Keyboard shortcut to open the table editor. Use "mod" for Cmd (Mac) or Ctrl (Windows/Linux). Examples: mod+shift+t, ctrl+alt+t, mod+e'
+  },
+  {
+    key: 'enableInlineRenderer',
+    type: 'boolean',
+    default: true,
+    title: 'Inline table rendering',
+    description: "Render markdown-table blocks inline as tables (replacing Logseq's native outline view), with an Edit button. Requires a Logseq version that supports the experimental block renderer API; ignored on older versions. Reload the plugin after changing this."
   }
 ]
 
@@ -104,6 +113,72 @@ if (isInBrowser) {
 
       logseqEditor.registerBlockContextMenuItem(i18n.t('Markdown Table Editor'), commandCallback)
       logseqEditor.registerSlashCommand('Markdown Table Editor', commandCallback)
+
+      // Inline block renderer: replace Logseq's native view for markdown-table
+      // blocks with a read-only table + Edit button. Host-mounted via the
+      // experimental Experiments API; a clean no-op on older Logseq hosts.
+      const inlineEnabled = logseq.settings?.enableInlineRenderer !== false
+      if (inlineEnabled && typeof logseq.Experiments?.registerBlockRenderer === 'function') {
+        logseq.provideStyle(`
+          .lsp-mdtable-renderer { margin: 4px 0; }
+          .lsp-mdtable-renderer table {
+            border-collapse: collapse; width: 100%;
+            color: var(--ls-primary-text-color);
+          }
+          .lsp-mdtable-renderer th, .lsp-mdtable-renderer td {
+            border: 1px solid var(--ls-border-color); padding: 4px 8px;
+            text-align: left; vertical-align: top; white-space: pre-wrap;
+          }
+          .lsp-mdtable-renderer th { background: var(--ls-secondary-background-color); }
+          .lsp-mdtable-renderer .lsp-mdtable-text { white-space: pre-wrap; opacity: .85; }
+          .lsp-mdtable-renderer .lsp-mdtable-edit {
+            margin-top: 6px; padding: 2px 10px; font-size: 12px; cursor: pointer;
+            border: 1px solid var(--ls-border-color); border-radius: 4px;
+            background: var(--ls-tertiary-background-color);
+            color: var(--ls-primary-text-color);
+          }
+        `)
+
+        logseq.Experiments.registerBlockRenderer('markdown-table-view', {
+          includeChildren: false,
+          priority: 10,
+          when: ({ content, format }) =>
+            (format === undefined || format === 'markdown') &&
+            looksLikeMarkdownTable(content),
+          render: ({ uuid, blockId, content }) => {
+            const React = logseq.Experiments.React
+            const id = uuid || blockId
+            const src = content || ''
+            const segments = splitStrByTable(src, parseMarkdownTable(src))
+            const children = segments.map((seg, si) => {
+              if (seg.type !== 'table') {
+                return seg.str
+                  ? React.createElement('div',
+                      { key: 's' + si, className: 'lsp-mdtable-text' }, seg.str)
+                  : null
+              }
+              const matrix = markdownTableToMatrix(seg.str)
+              const [head = [], ...body] = matrix
+              return React.createElement('table', { key: 's' + si }, [
+                React.createElement('thead', { key: 'h' },
+                  React.createElement('tr', null,
+                    head.map((c, i) => React.createElement('th', { key: i }, c)))),
+                React.createElement('tbody', { key: 'b' },
+                  body.map((row, ri) => React.createElement('tr', { key: ri },
+                    head.map((_, ci) =>
+                      React.createElement('td', { key: ci }, row[ci] ?? '')))))
+              ])
+            })
+            children.push(React.createElement('button', {
+              key: 'edit',
+              className: 'lsp-mdtable-edit',
+              onClick: () => commandCallback({ uuid: id }) // existing modal flow
+            }, i18n.t('Edit table')))
+            return React.createElement('div',
+              { className: 'lsp-mdtable-renderer' }, children)
+          }
+        })
+      }
 
       // Register keyboard shortcut from settings
       const shortcut = logseq.settings?.keyboardShortcut || 'mod+shift+t'
