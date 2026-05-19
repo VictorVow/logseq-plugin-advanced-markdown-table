@@ -289,8 +289,16 @@ const ICONS = {
   moveColRight:SVG('<line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/>'),
   sortColAsc:  SVG('<path d="M11 5h3M11 10h6M11 15h9"/><polyline points="4 8 7 5 10 8"/><line x1="7" y1="5" x2="7" y2="19"/>'),
   sortColDesc: SVG('<path d="M11 5h9M11 10h6M11 15h3"/><polyline points="4 16 7 19 10 16"/><line x1="7" y1="5" x2="7" y2="19"/>'),
-  pin: SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z"/>')
+  pin: SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z"/>'),
+  fullscreen:     SVG('<polyline points="4 9 4 4 9 4"/><polyline points="20 9 20 4 15 4"/><polyline points="4 15 4 20 9 20"/><polyline points="20 15 20 20 15 20"/>'),
+  exitFullscreen: SVG('<polyline points="9 4 9 9 4 9"/><polyline points="15 4 15 9 20 9"/><polyline points="4 15 9 15 9 20"/><polyline points="20 15 15 15 15 20"/>')
 }
+
+// Overlay host for popovers/toolbars: when the renderer is in native
+// fullscreen, doc.body sits beneath the fullscreen element's top layer and
+// our popups would be invisible. Mount them inside the fullscreen element
+// in that case so they share the top layer.
+const overlayHost = (doc) => doc.fullscreenElement || doc.webkitFullscreenElement || doc.body
 
 const closeMenu = (doc) => {
   const el = doc.querySelector('.lsp-mdt-menu')
@@ -343,6 +351,29 @@ const buildItems = (root, opts, cell) => {
 }
 
 const isPinned = (opts) => !!(opts.isPinned && opts.isPinned())
+
+// Full-screen toggle item; lives next to Pin/Unpin in both the right-click
+// menu and the pinned toolbar. Uses the native Fullscreen API on the
+// renderer root so the DOM doesn't move and all editing hooks stay bound.
+// `after(nowFs)` lets the surface refresh its item state.
+const fullScreenItem = (root, opts, after) => {
+  const doc = root.ownerDocument
+  const fsEl = doc.fullscreenElement || doc.webkitFullscreenElement
+  const isFs = fsEl === root
+  const L = opts.menuLabels || {}
+  return {
+    icon: isFs ? ICONS.exitFullscreen : ICONS.fullscreen,
+    label: isFs ? (L.exitFullScreen || 'Exit full screen') : (L.fullScreen || 'Full screen'),
+    enabled: true,
+    action: () => {
+      try {
+        if (isFs) (doc.exitFullscreen || doc.webkitExitFullscreen).call(doc)
+        else (root.requestFullscreen || root.webkitRequestFullscreen).call(root)
+      } catch (e) { console.warn('[mdtable] fullscreen toggle failed', e) }
+      if (after) after(!isFs)
+    }
+  }
+}
 
 // Pin/Unpin toggle item; `after(nowPinned)` lets the surface refresh.
 const pinItem = (opts, after) => {
@@ -405,6 +436,7 @@ const buildToolbar = (root, opts, cell) => {
   const aRow = Array.from(cell.closest('table.lsp-mdt').querySelectorAll('tr')).indexOf(aTr)
   const aCol = Array.from(aTr.querySelectorAll('th,td')).indexOf(cell)
   const all = items.concat([{ sep: true },
+    fullScreenItem(root, opts, () => buildToolbar(root, opts, cell)),
     pinItem(opts, () => removeToolbar(doc))]) // pinned bar's toggle = unpin
 
   const bar = doc.createElement('div')
@@ -429,7 +461,7 @@ const buildToolbar = (root, opts, cell) => {
     }
     bar.appendChild(b)
   })
-  doc.body.appendChild(bar)
+  overlayHost(doc).appendChild(bar)
   positionToolbar(cell, bar)
 }
 
@@ -440,6 +472,7 @@ const openContextMenu = (root, opts, cell, ev) => {
 
   const { items, ord } = buildItems(root, opts, cell)
   const all = items.concat([{ sep: true },
+    fullScreenItem(root, opts),
     pinItem(opts, (now) => { if (now) buildToolbar(root, opts, cell); else removeToolbar(doc) })])
 
   const menu = doc.createElement('div')
@@ -469,7 +502,7 @@ const openContextMenu = (root, opts, cell, ev) => {
   // Off-screen first so we can measure, then clamp into the viewport.
   menu.style.left = '-9999px'
   menu.style.top = '-9999px'
-  doc.body.appendChild(menu)
+  overlayHost(doc).appendChild(menu)
   const mw = menu.offsetWidth, mh = menu.offsetHeight
   const vw = doc.documentElement.clientWidth, vh = doc.documentElement.clientHeight
   menu.style.left = Math.max(4, Math.min(ev.clientX, vw - mw - 4)) + 'px'
@@ -503,7 +536,7 @@ const DRAG_THRESHOLD = 4  // px before a press becomes a drag
 
 const dropLine = (doc) => {
   let el = doc.querySelector('.lsp-mdt-dropline')
-  if (!el) { el = doc.createElement('div'); el.className = 'lsp-mdt-dropline'; doc.body.appendChild(el) }
+  if (!el) { el = doc.createElement('div'); el.className = 'lsp-mdt-dropline'; overlayHost(doc).appendChild(el) }
   return el
 }
 const removeDropLine = (doc) => {
