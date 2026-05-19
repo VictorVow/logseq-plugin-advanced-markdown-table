@@ -1,13 +1,13 @@
 {
-  "name": "victor-logseq-plugin-markdown-table",
-  "version": "1.9.0",
+  "name": "logseq-inline-markdown-table",
+  "version": "1.0.0",
   "private": true,
-  "description": "markdown table editor for logseq",
+  "description": "inline markdown table editor for logseq",
   "main": "build/index.html",
   "homepage": "./",
   "logseq": {
-    "title": "Victor's Markdown Table",
-    "id": "victor-logseq-markdown-table",
+    "title": "Inline Markdown Table Editor",
+    "id": "logseq-inline-markdown-table",
     "icon": "./logo.png"
   },
   "scripts": {
