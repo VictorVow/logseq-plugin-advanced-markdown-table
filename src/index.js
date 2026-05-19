@@ -45,6 +45,20 @@ const settingsSchema = [
     default: true,
     title: 'Native table edit button',
     description: "Show an \"Edit Markdown Table\" button (top-left, on hover) over Logseq's natively-rendered markdown tables; clicking opens the table editor. Reload the plugin after changing this."
+  },
+  {
+    key: 'monospaceTableSource',
+    type: 'boolean',
+    default: true,
+    title: 'Monospace table source when editing',
+    description: "While editing a block whose content is a markdown table, render its raw source in a monospace font so aligned tables (see the \"readable data\" toolbar action) actually line up in Logseq's editor. Reload the plugin after changing this."
+  },
+  {
+    key: 'monoFontSizeOffset',
+    type: 'number',
+    default: -1,
+    title: 'Monospace table font size offset (px)',
+    description: "Adjust the monospace table-source font size relative to Logseq's base font, in pixels (e.g. -1 = 1px smaller, 0 = same, 2 = 2px larger). Reload the plugin after changing this."
   }
 ]
 
@@ -262,6 +276,38 @@ if (isInBrowser) {
             })
           })
           obs.observe(hostDoc.body, { childList: true, subtree: true })
+        }
+      }
+
+      // Monospace table source when editing: while a block whose raw content
+      // is a markdown table is being edited, render its <textarea> in a
+      // monospace font so "readable data"-aligned tables actually line up
+      // (Logseq's source editor otherwise uses a proportional font).
+      const monoEnabled = logseq.settings?.monospaceTableSource !== false
+      if (monoEnabled) {
+        const monoOffsetRaw = Number(logseq.settings?.monoFontSizeOffset)
+        const monoOffset = Number.isFinite(monoOffsetRaw) ? monoOffsetRaw : -1
+        const monoFontSize = monoOffset === 0
+          ? '1em'
+          : `calc(1em ${monoOffset < 0 ? '-' : '+'} ${Math.abs(monoOffset)}px)`
+        logseq.provideStyle(`
+          textarea.lsp-mdt-mono {
+            font-family: 'Fira Code', Menlo, Monaco, Consolas, 'Courier New', monospace !important;
+            font-size: ${monoFontSize} !important;
+          }
+        `)
+        let hostDoc2 = null
+        try { hostDoc2 = (window.top || window.parent)?.document } catch (e) { /* cross-origin */ }
+        if (!hostDoc2) {
+          console.warn('[mdtable] monospace table source: host document not accessible; skipped')
+        } else {
+          const applyMono = (el) => {
+            if (!el || el.tagName !== 'TEXTAREA') return
+            if (!el.closest('.editor-inner, .block-editor, .editor-wrapper, .ls-block')) return
+            el.classList.toggle('lsp-mdt-mono', looksLikeMarkdownTable(el.value))
+          }
+          hostDoc2.addEventListener('focusin', (e) => applyMono(e.target), true)
+          hostDoc2.addEventListener('input', (e) => applyMono(e.target), true)
         }
       }
 
