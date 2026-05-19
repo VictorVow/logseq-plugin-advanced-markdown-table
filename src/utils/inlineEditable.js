@@ -155,6 +155,19 @@ const buildContent = (root, segments, transform) => {
   }).join('\n')
 }
 
+// Move focus to a cell and place the caret at the end of its text.
+const caretToEnd = (el) => {
+  el.focus()
+  const doc = el.ownerDocument
+  const sel = (doc.defaultView || window).getSelection && (doc.defaultView || window).getSelection()
+  if (!sel) return
+  const range = doc.createRange()
+  range.selectNodeContents(el)
+  range.collapse(false)
+  sel.removeAllRanges()
+  sel.addRange(range)
+}
+
 const writeContent = (blockId, content, updateBlock) => {
   if (lastWritten.get(blockId) === content) return // nothing changed
   lastWritten.set(blockId, content)
@@ -298,9 +311,9 @@ const openContextMenu = (root, opts, cell, ev) => {
     { icon: ICONS.insertRowBelow, label: L.insertRowBelow || 'Insert row below', enabled: true,
       run: m => tableOps.insertRowBelow(m, rowIdx) },
     { icon: ICONS.moveRowUp, label: L.moveRowUp || 'Move row up', enabled: rowIdx >= 2,
-      run: m => tableOps.moveRowUp(m, rowIdx) },
+      hint: 'Ctrl+Shift+Enter', run: m => tableOps.moveRowUp(m, rowIdx) },
     { icon: ICONS.moveRowDown, label: L.moveRowDown || 'Move row down', enabled: rowIdx >= 1 && rowIdx < rowCount - 1,
-      run: m => tableOps.moveRowDown(m, rowIdx) },
+      hint: 'Ctrl+Enter', run: m => tableOps.moveRowDown(m, rowIdx) },
     { icon: ICONS.deleteRow, label: L.deleteRow || 'Delete row', enabled: rowCount >= 2,
       run: m => tableOps.deleteRow(m, rowIdx) },
     { sep: true },
@@ -327,6 +340,7 @@ const openContextMenu = (root, opts, cell, ev) => {
     if (it.sep) { const s = doc.createElement('div'); s.className = 'lsp-mdt-menu-sep'; menu.appendChild(s); return }
     const mi = doc.createElement('div')
     mi.className = 'lsp-mdt-menu-item' + (it.enabled ? '' : ' disabled')
+    if (it.hint) mi.title = it.hint
     const ic = doc.createElement('span')
     ic.className = 'lsp-mdt-menu-icon'
     ic.innerHTML = it.icon || ''
@@ -540,6 +554,23 @@ export const attachInlineEditing = (root, opts) => {
   root.addEventListener('click', swallow, true)
   root.addEventListener('keydown', swallow, true)
   root.addEventListener('dblclick', swallow, true)
+
+  // Ctrl+Enter: move caret to the cell below (same column); add Shift to
+  // go up. Always preventDefault so it never inserts a newline, even at
+  // the table edge where there is no row to move to.
+  root.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !e.ctrlKey) return
+    const cell = e.target.closest && e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (!cell) return
+    e.preventDefault(); e.stopPropagation()
+    const table = cell.closest('table.lsp-mdt')
+    const tr = cell.closest('tr')
+    const rows = Array.from(table.querySelectorAll('tr'))
+    const colIdx = Array.from(tr.querySelectorAll('th,td')).indexOf(cell)
+    const target = rows[rows.indexOf(tr) + (e.shiftKey ? -1 : 1)]
+    const next = target && target.querySelectorAll('th,td')[colIdx]
+    if (next) caretToEnd(next)
+  }, true)
 
   // Force plain-text paste so markup can't smuggle structure into a cell.
   root.addEventListener('paste', (e) => {
