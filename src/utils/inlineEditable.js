@@ -186,10 +186,11 @@ const caretToEnd = (el) => {
   sel.addRange(range)
 }
 
-// Move the caret to the cell directly above/below the currently focused
-// markdown-table cell (same column). No-op if focus isn't in a cell, or
-// at the table edge. Invoked from Logseq command-shortcut callbacks so
-// the keybinding is editable in the host's keymap.
+// Move the caret to a neighbouring cell of the currently focused markdown-
+// table cell. `direction` ∈ 'up' | 'down' | 'left' | 'right'. No-op if
+// focus isn't in a cell, or at the table edge. Invoked from Logseq
+// command-shortcut callbacks so the keybinding is editable in the host's
+// keymap.
 export const moveCaretInFocusedTableCell = (direction) => {
   let hostDoc = null
   try { hostDoc = (window.top || window.parent)?.document } catch (_) { /* cross-origin */ }
@@ -200,9 +201,15 @@ export const moveCaretInFocusedTableCell = (direction) => {
   const table = cell.closest('table.lsp-mdt')
   const tr = cell.closest('tr')
   const rows = Array.from(table.querySelectorAll('tr'))
-  const colIdx = Array.from(tr.querySelectorAll('th,td')).indexOf(cell)
-  const target = rows[rows.indexOf(tr) + (direction === 'up' ? -1 : 1)]
-  const next = target && target.querySelectorAll('th,td')[colIdx]
+  const cells = Array.from(tr.querySelectorAll('th,td'))
+  const colIdx = cells.indexOf(cell)
+  let next = null
+  if (direction === 'up' || direction === 'down') {
+    const target = rows[rows.indexOf(tr) + (direction === 'up' ? -1 : 1)]
+    next = target && target.querySelectorAll('th,td')[colIdx]
+  } else if (direction === 'left' || direction === 'right') {
+    next = cells[colIdx + (direction === 'left' ? -1 : 1)]
+  }
   if (next) caretToEnd(next)
 }
 
@@ -223,7 +230,53 @@ export const insertInFocusedTableCell = (which) => {
   doInsertOp(root, opts, cell, which)
 }
 
-// Shared by the local Alt+Shift+Arrow handler and the registered insert
+// Move the focused cell's row/column. `which` ∈ 'rowUp' | 'rowDown' |
+// 'colLeft' | 'colRight'. No-op if focus isn't in a cell or the op is
+// invalid at this edge (e.g. moving the first body row up would swap it
+// with the header).
+export const moveInFocusedTableCell = (which) => {
+  let hostDoc = null
+  try { hostDoc = (window.top || window.parent)?.document } catch (_) { /* cross-origin */ }
+  if (!hostDoc) return
+  const active = hostDoc.activeElement
+  const cell = active && active.closest && active.closest('table.lsp-mdt th, table.lsp-mdt td')
+  if (!cell) return
+  const root = cell.closest('.lsp-mdtable-renderer')
+  const opts = root && root._lspInlineOpts
+  if (!opts) return
+  doMoveOp(root, opts, cell, which)
+}
+
+// Shared by the local Alt+Shift+Arrow handler and the registered move
+// commands. Stashes a `pendingToolbar` entry at the moved cell's new
+// position so `resumePinnedToolbar` follows the cell after re-render.
+const doMoveOp = (root, opts, cell, which) => {
+  const tableEl = cell.closest('table.lsp-mdt')
+  const tr = cell.closest('tr')
+  const rows = Array.from(tableEl.querySelectorAll('tr'))
+  const rowIdx = rows.indexOf(tr)
+  const cells = Array.from(tr.querySelectorAll('th,td'))
+  const colIdx = cells.indexOf(cell)
+  const ord = Array.from(root.querySelectorAll('table.lsp-mdt')).indexOf(tableEl)
+  let op, newRow = rowIdx, newCol = colIdx
+  if (which === 'rowUp') {
+    if (rowIdx < 2) return // can't swap a body row over the header
+    op = tableOps.moveRowUp; newRow = rowIdx - 1
+  } else if (which === 'rowDown') {
+    if (rowIdx < 1 || rowIdx >= rows.length - 1) return
+    op = tableOps.moveRowDown; newRow = rowIdx + 1
+  } else if (which === 'colLeft') {
+    if (colIdx < 1) return
+    op = tableOps.moveColLeft; newCol = colIdx - 1
+  } else if (which === 'colRight') {
+    if (colIdx >= cells.length - 1) return
+    op = tableOps.moveColRight; newCol = colIdx + 1
+  } else return
+  pendingToolbar.set(opts.blockId, { ord, rowIdx: newRow, colIdx: newCol })
+  commitStructural(root, opts, (m, i) => (i === ord ? op(m, rowIdx, colIdx) : m))
+}
+
+// Shared by the local Alt+Ctrl+Shift+Arrow handler and the registered insert
 // commands. Stashes a `pendingToolbar` entry at the new cell's position
 // so `resumePinnedToolbar` refocuses it after the re-render (and re-pins
 // the toolbar if the user has it pinned).
@@ -398,24 +451,24 @@ const buildItems = (root, opts, cell) => {
   const L = opts.menuLabels || {}
   const items = [
     { icon: ICONS.insertRowAbove, label: L.insertRowAbove || 'Insert row above', enabled: rowIdx >= 1,
-      shortcut: 'Alt+Shift+Up', run: m => tableOps.insertRowAbove(m, rowIdx) },
+      shortcut: 'Alt+Ctrl+Shift+Up', run: m => tableOps.insertRowAbove(m, rowIdx) },
     { icon: ICONS.insertRowBelow, label: L.insertRowBelow || 'Insert row below', enabled: true,
-      shortcut: 'Alt+Shift+Down', run: m => tableOps.insertRowBelow(m, rowIdx) },
+      shortcut: 'Alt+Ctrl+Shift+Down', run: m => tableOps.insertRowBelow(m, rowIdx) },
     { icon: ICONS.moveRowUp, label: L.moveRowUp || 'Move row up', enabled: rowIdx >= 2,
-      run: m => tableOps.moveRowUp(m, rowIdx) },
+      shortcut: 'Alt+Shift+Up', run: m => tableOps.moveRowUp(m, rowIdx) },
     { icon: ICONS.moveRowDown, label: L.moveRowDown || 'Move row down', enabled: rowIdx >= 1 && rowIdx < rowCount - 1,
-      run: m => tableOps.moveRowDown(m, rowIdx) },
+      shortcut: 'Alt+Shift+Down', run: m => tableOps.moveRowDown(m, rowIdx) },
     { icon: ICONS.deleteRow, label: L.deleteRow || 'Delete row', enabled: rowCount >= 2,
       run: m => tableOps.deleteRow(m, rowIdx) },
     { sep: true },
     { icon: ICONS.insertColLeft, label: L.insertColLeft || 'Insert column left', enabled: true,
-      shortcut: 'Alt+Shift+Left', run: m => tableOps.insertColLeft(m, rowIdx, colIdx) },
+      shortcut: 'Alt+Ctrl+Shift+Left', run: m => tableOps.insertColLeft(m, rowIdx, colIdx) },
     { icon: ICONS.insertColRight, label: L.insertColRight || 'Insert column right', enabled: true,
-      shortcut: 'Alt+Shift+Right', run: m => tableOps.insertColRight(m, rowIdx, colIdx) },
+      shortcut: 'Alt+Ctrl+Shift+Right', run: m => tableOps.insertColRight(m, rowIdx, colIdx) },
     { icon: ICONS.moveColLeft, label: L.moveColLeft || 'Move column left', enabled: colIdx >= 1,
-      run: m => tableOps.moveColLeft(m, rowIdx, colIdx) },
+      shortcut: 'Alt+Shift+Left', run: m => tableOps.moveColLeft(m, rowIdx, colIdx) },
     { icon: ICONS.moveColRight, label: L.moveColRight || 'Move column right', enabled: colIdx < colCount - 1,
-      run: m => tableOps.moveColRight(m, rowIdx, colIdx) },
+      shortcut: 'Alt+Shift+Right', run: m => tableOps.moveColRight(m, rowIdx, colIdx) },
     { icon: ICONS.deleteCol, label: L.deleteCol || 'Delete column', enabled: colCount >= 2,
       run: m => tableOps.deleteCol(m, rowIdx, colIdx) },
     { sep: true },
@@ -836,13 +889,35 @@ export const attachInlineEditing = (root, opts) => {
     moveCaretInFocusedTableCell(e.shiftKey ? 'up' : 'down')
   }, true)
 
-  // Alt+Shift+Arrow: insert a row above/below or a column left/right of
-  // the focused cell. Local handler for the same reason as Ctrl+Enter —
+  // Alt+Ctrl+Arrow: caret nav between adjacent cells in the table. Local
+  // handler for the same reason as the Ctrl+Enter / Alt+Ctrl+Shift+Arrow paths
+  // (capture-phase swallowing hides the keys from Logseq's dispatcher);
+  // matching commands are registered with Logseq so they appear in the
+  // command palette / keymap UI.
+  const caretNavKey = (e) => {
+    if (!e.altKey || !e.ctrlKey || e.shiftKey || e.metaKey) return null
+    if (e.key === 'ArrowDown') return 'down'
+    if (e.key === 'ArrowUp') return 'up'
+    if (e.key === 'ArrowRight') return 'right'
+    if (e.key === 'ArrowLeft') return 'left'
+    return null
+  }
+  root.addEventListener('keydown', (e) => {
+    const dir = caretNavKey(e)
+    if (!dir) return
+    const cell = e.target.closest && e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (!cell) return
+    e.preventDefault(); e.stopPropagation()
+    moveCaretInFocusedTableCell(dir)
+  }, true)
+
+  // Alt+Ctrl+Shift+Arrow: insert a row above/below or a column left/right
+  // of the focused cell. Local handler for the same reason as Ctrl+Enter —
   // capture-phase swallowing means Logseq never sees the key, so a
   // global shortcut would be unreliable; the registered commands below
   // mirror these actions for the palette / keymap UI.
   const insertKey = (e) => {
-    if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return null
+    if (!e.altKey || !e.shiftKey || !e.ctrlKey || e.metaKey) return null
     if (e.key === 'ArrowDown') return 'rowBelow'
     if (e.key === 'ArrowUp') return 'rowAbove'
     if (e.key === 'ArrowRight') return 'colRight'
@@ -856,6 +931,26 @@ export const attachInlineEditing = (root, opts) => {
     if (!cell) return
     e.preventDefault(); e.stopPropagation()
     doInsertOp(root, opts, cell, which)
+  }, true)
+
+  // Alt+Shift+Arrow: move the focused row/column. Local handler (same
+  // capture-phase reason as the other in-table keybinds); registered
+  // commands below mirror these for the palette / keymap UI.
+  const moveKey = (e) => {
+    if (!e.altKey || !e.shiftKey || e.ctrlKey || e.metaKey) return null
+    if (e.key === 'ArrowDown') return 'rowDown'
+    if (e.key === 'ArrowUp') return 'rowUp'
+    if (e.key === 'ArrowRight') return 'colRight'
+    if (e.key === 'ArrowLeft') return 'colLeft'
+    return null
+  }
+  root.addEventListener('keydown', (e) => {
+    const which = moveKey(e)
+    if (!which) return
+    const cell = e.target.closest && e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (!cell) return
+    e.preventDefault(); e.stopPropagation()
+    doMoveOp(root, opts, cell, which)
   }, true)
 
   // Force plain-text paste so markup can't smuggle structure into a cell.

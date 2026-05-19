@@ -3,7 +3,7 @@ import '@logseq/libs'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
-import { attachInlineEditing, insertInFocusedTableCell, moveCaretInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
+import { attachInlineEditing, insertInFocusedTableCell, moveCaretInFocusedTableCell, moveInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
 import i18n from './locales/i18n'
 import './index.css'
 
@@ -141,8 +141,16 @@ if (isInBrowser) {
         key: 'mdtable-move-caret-up',
         label: i18n.t('Markdown table: move caret to cell above')
       }, () => moveCaretInFocusedTableCell('up'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-move-caret-left',
+        label: i18n.t('Markdown table: move caret to cell left')
+      }, () => moveCaretInFocusedTableCell('left'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-move-caret-right',
+        label: i18n.t('Markdown table: move caret to cell right')
+      }, () => moveCaretInFocusedTableCell('right'))
 
-      // Row/column insertion. Default Alt+Shift+Arrow keys are wired up
+      // Row/column insertion. Default Alt+Ctrl+Shift+Arrow keys are wired up
       // by a local handler in `attachInlineEditing` (see Ctrl+Enter
       // comment for why the local path is needed); these palette entries
       // mirror those actions so they show up in Logseq's keymap UI and
@@ -163,6 +171,26 @@ if (isInBrowser) {
         key: 'mdtable-insert-col-left',
         label: i18n.t('Markdown table: insert column left')
       }, () => insertInFocusedTableCell('colLeft'))
+
+      // Row/column move. Default Alt+Shift+Arrow keys are wired up by a
+      // local handler in `attachInlineEditing`; these palette entries
+      // mirror them for the command palette / keymap UI.
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-move-row-up',
+        label: i18n.t('Markdown table: move row up')
+      }, () => moveInFocusedTableCell('rowUp'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-move-row-down',
+        label: i18n.t('Markdown table: move row down')
+      }, () => moveInFocusedTableCell('rowDown'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-move-col-left',
+        label: i18n.t('Markdown table: move column left')
+      }, () => moveInFocusedTableCell('colLeft'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-move-col-right',
+        label: i18n.t('Markdown table: move column right')
+      }, () => moveInFocusedTableCell('colRight'))
 
       // Inline block renderer: replace Logseq's native view for markdown-table
       // blocks with an editable table. Host-mounted via the experimental
