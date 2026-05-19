@@ -237,6 +237,30 @@ if (isInBrowser) {
             height: 1px; margin: 4px 6px;
             background: var(--ls-border-color);
           }
+          /* Edge drag-reorder: subtle always-on grip hint on the table's
+             top edge (columns) and left edge (rows). */
+          .lsp-mdtable-renderer table.lsp-mdt {
+            box-shadow:
+              inset 0 4px 0 -2px var(--ls-border-color),
+              inset 4px 0 0 -2px var(--ls-border-color);
+          }
+          .lsp-mdtable-renderer.lsp-mdt-grab,
+          .lsp-mdtable-renderer.lsp-mdt-grab table.lsp-mdt th,
+          .lsp-mdtable-renderer.lsp-mdt-grab table.lsp-mdt td {
+            cursor: grab !important;
+          }
+          /* Hover affordance: blue bar on the grabbable edge. */
+          .lsp-mdtable-renderer table.lsp-mdt th.lsp-mdt-edge-col {
+            box-shadow: inset 0 3px 0 0 var(--ls-active-primary-color, #2563eb) !important;
+          }
+          .lsp-mdtable-renderer table.lsp-mdt th.lsp-mdt-edge-row,
+          .lsp-mdtable-renderer table.lsp-mdt td.lsp-mdt-edge-row {
+            box-shadow: inset 3px 0 0 0 var(--ls-active-primary-color, #2563eb) !important;
+          }
+          .lsp-mdtable-renderer.lsp-mdt-dragging,
+          .lsp-mdtable-renderer.lsp-mdt-dragging * {
+            cursor: grabbing !important; user-select: none !important;
+          }
         `)
 
         logseq.Experiments.registerBlockRenderer('markdown-table-view', {

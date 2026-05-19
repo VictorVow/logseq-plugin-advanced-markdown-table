@@ -233,6 +233,26 @@ const tableOps = {
   sortColDesc: (m, _r, c) => sortBody(m, c, -1)
 }
 
+// Move arr[from] to a gap index (0..len): the slot between elements,
+// as used by drag-and-drop. gap === from or from+1 is a no-op.
+const arrMoveGap = (arr, from, gap) => {
+  const x = arr.slice()
+  const [v] = x.splice(from, 1)
+  x.splice(gap > from ? gap - 1 : gap, 0, v)
+  return x
+}
+// Reorder whole columns (header included) to a drop gap.
+const moveColumnTo = (m, from, gap) => {
+  const cols = Math.max(0, ...m.map(r => r.length))
+  const order = arrMoveGap(Array.from({ length: cols }, (_, i) => i), from, gap)
+  return m.map(row => order.map(i => row[i] ?? ''))
+}
+// Reorder body rows (header row 0 fixed); indices are body-relative.
+const moveRowTo = (m, from, gap) => {
+  if (m.length < 2) return m
+  return [m[0], ...arrMoveGap(m.slice(1), from, gap)]
+}
+
 // 14px line icons (stroke=currentColor), matching the edit-pencil SVG style
 // used elsewhere. Chevron = direction of insertion; trash = delete.
 const SVG = (body) =>
@@ -350,6 +370,155 @@ const openContextMenu = (root, opts, cell, ev) => {
   }
 }
 
+// --- Edge drag-reorder ---------------------------------------------------
+//
+// The top edge of the header row is a column-drag handle; the left edge of
+// each body row's first cell is a row-drag handle. Pointer based (no React
+// DOM restructuring): on drop we compute the target gap from live cell
+// rects and reorder via the same commitStructural path as everything else.
+const DRAG_EDGE = 10      // px band along the table edge that grabs
+const DRAG_THRESHOLD = 4  // px before a press becomes a drag
+
+const dropLine = (doc) => {
+  let el = doc.querySelector('.lsp-mdt-dropline')
+  if (!el) { el = doc.createElement('div'); el.className = 'lsp-mdt-dropline'; doc.body.appendChild(el) }
+  return el
+}
+const removeDropLine = (doc) => {
+  const el = doc.querySelector('.lsp-mdt-dropline')
+  if (el) el.remove()
+}
+
+const attachDragReorder = (root, opts) => {
+  const doc = root.ownerDocument
+
+  // Which edge handle (if any) is under the pointer.
+  const edgeZone = (e) => {
+    const cell = e.target.closest && e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (!cell) return null
+    const table = cell.closest('table.lsp-mdt')
+    const r = cell.getBoundingClientRect()
+    if (cell.closest('thead') && e.clientY - r.top <= DRAG_EDGE) {
+      const ths = Array.from(table.querySelectorAll('thead th'))
+      return { mode: 'col', table, from: ths.indexOf(cell), el: cell }
+    }
+    const tr = cell.closest('tr')
+    if (!cell.closest('thead') && tr && cell === tr.querySelector('th,td') &&
+        e.clientX - r.left <= DRAG_EDGE) {
+      const rows = Array.from(table.querySelectorAll('tbody tr'))
+      return { mode: 'row', table, from: rows.indexOf(tr), el: cell }
+    }
+    return null
+  }
+
+  const colGap = (table, x) => {
+    const ths = Array.from(table.querySelectorAll('thead th'))
+    let gap = ths.length
+    for (let i = 0; i < ths.length; i++) {
+      const r = ths[i].getBoundingClientRect()
+      if (x < r.left + r.width / 2) { gap = i; break }
+    }
+    return { gap, els: ths }
+  }
+  const rowGap = (table, y) => {
+    const rows = Array.from(table.querySelectorAll('tbody tr'))
+    let gap = rows.length
+    for (let i = 0; i < rows.length; i++) {
+      const r = rows[i].getBoundingClientRect()
+      if (y < r.top + r.height / 2) { gap = i; break }
+    }
+    return { gap, els: rows }
+  }
+
+  const draw = (st) => {
+    const tr = st.table.getBoundingClientRect()
+    const el = dropLine(doc)
+    if (st.mode === 'col') {
+      const els = st.els
+      const x = st.gap >= els.length
+        ? els[els.length - 1].getBoundingClientRect().right
+        : els[st.gap].getBoundingClientRect().left
+      el.style.cssText = `position:fixed;z-index:2147483647;pointer-events:none;width:2px;` +
+        `background:var(--ls-active-primary-color,#2563eb);left:${x}px;top:${tr.top}px;height:${tr.height}px;`
+    } else {
+      const els = st.els
+      const y = !els.length ? tr.bottom
+        : st.gap >= els.length
+          ? els[els.length - 1].getBoundingClientRect().bottom
+          : els[st.gap].getBoundingClientRect().top
+      el.style.cssText = `position:fixed;z-index:2147483647;pointer-events:none;height:2px;` +
+        `background:var(--ls-active-primary-color,#2563eb);top:${y}px;left:${tr.left}px;width:${tr.width}px;`
+    }
+  }
+
+  let st = null
+
+  // Hover affordance: blue highlight on the handle edge of the column/row
+  // that would be grabbed (not shown while dragging).
+  let hoverEl = null
+  const EDGE_CLASSES = ['lsp-mdt-edge-col', 'lsp-mdt-edge-row']
+  const clearHover = () => {
+    if (hoverEl) hoverEl.classList.remove(...EDGE_CLASSES)
+    hoverEl = null
+    root.classList.remove('lsp-mdt-grab')
+  }
+  const setHover = (z) => {
+    const el = z && z.el
+    if (el !== hoverEl) {
+      if (hoverEl) hoverEl.classList.remove(...EDGE_CLASSES)
+      hoverEl = el || null
+      if (el) el.classList.add(z.mode === 'col' ? 'lsp-mdt-edge-col' : 'lsp-mdt-edge-row')
+    }
+    root.classList.toggle('lsp-mdt-grab', !!el)
+  }
+
+  root.addEventListener('pointermove', (e) => {
+    if (!st) { setHover(edgeZone(e)); return }
+    if (!st.moved) {
+      if (Math.abs(e.clientX - st.x0) + Math.abs(e.clientY - st.y0) < DRAG_THRESHOLD) return
+      st.moved = true
+    }
+    const g = st.mode === 'col' ? colGap(st.table, e.clientX) : rowGap(st.table, e.clientY)
+    st.gap = g.gap; st.els = g.els
+    draw(st)
+  })
+  root.addEventListener('pointerleave', () => { if (!st) clearHover() })
+
+  root.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return
+    const z = edgeZone(e)
+    if (!z || z.from < 0) return
+    e.preventDefault(); e.stopPropagation()
+    st = { ...z, x0: e.clientX, y0: e.clientY, moved: false, gap: null, els: [],
+           ord: Array.from(root.querySelectorAll('table.lsp-mdt')).indexOf(z.table) }
+    try { root.setPointerCapture(e.pointerId) } catch (_) { /* noop */ }
+    clearHover() // no hover highlight while dragging
+    root.classList.add('lsp-mdt-dragging')
+  }, true)
+
+  const finish = (commit) => {
+    if (!st) return
+    const s = st; st = null
+    root.classList.remove('lsp-mdt-dragging')
+    clearHover()
+    removeDropLine(doc)
+    if (!commit || !s.moved || s.gap == null) return
+    if (s.gap === s.from || s.gap === s.from + 1) return // dropped in place
+    const op = s.mode === 'col' ? moveColumnTo : moveRowTo
+    commitStructural(root, opts, (m, i) => (i === s.ord ? op(m, s.from, s.gap) : m))
+  }
+
+  root.addEventListener('pointerup', (e) => {
+    if (!st) return
+    e.preventDefault(); e.stopPropagation()
+    finish(true)
+  }, true)
+  root.addEventListener('pointercancel', () => finish(false), true)
+  doc.addEventListener('keydown', (e) => {
+    if (st && e.key === 'Escape') { e.stopPropagation(); finish(false) }
+  }, true)
+}
+
 // Attach editing behaviour to a freshly-rendered renderer root. Idempotent:
 // if Logseq reuses the DOM node across re-renders we don't double-bind.
 export const attachInlineEditing = (root, opts) => {
@@ -396,6 +565,8 @@ export const attachInlineEditing = (root, opts) => {
     e.stopPropagation()
     openContextMenu(root, opts, cell, e)
   }, true)
+
+  attachDragReorder(root, opts)
 }
 
 // Called when the renderer for a block is torn down / re-created so a pending
