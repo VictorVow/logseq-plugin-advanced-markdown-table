@@ -186,6 +186,26 @@ const caretToEnd = (el) => {
   sel.addRange(range)
 }
 
+// Move the caret to the cell directly above/below the currently focused
+// markdown-table cell (same column). No-op if focus isn't in a cell, or
+// at the table edge. Invoked from Logseq command-shortcut callbacks so
+// the keybinding is editable in the host's keymap.
+export const moveCaretInFocusedTableCell = (direction) => {
+  let hostDoc = null
+  try { hostDoc = (window.top || window.parent)?.document } catch (_) { /* cross-origin */ }
+  if (!hostDoc) return
+  const active = hostDoc.activeElement
+  const cell = active && active.closest && active.closest('table.lsp-mdt th, table.lsp-mdt td')
+  if (!cell) return
+  const table = cell.closest('table.lsp-mdt')
+  const tr = cell.closest('tr')
+  const rows = Array.from(table.querySelectorAll('tr'))
+  const colIdx = Array.from(tr.querySelectorAll('th,td')).indexOf(cell)
+  const target = rows[rows.indexOf(tr) + (direction === 'up' ? -1 : 1)]
+  const next = target && target.querySelectorAll('th,td')[colIdx]
+  if (next) caretToEnd(next)
+}
+
 const writeContent = (blockId, content, updateBlock) => {
   if (lastWritten.get(blockId) === content) return // nothing changed
   lastWritten.set(blockId, content)
@@ -751,21 +771,17 @@ export const attachInlineEditing = (root, opts) => {
   root.addEventListener('keydown', swallow, true)
   root.addEventListener('dblclick', swallow, true)
 
-  // Ctrl+Enter: move caret to the cell below (same column); add Shift to
-  // go up. Always preventDefault so it never inserts a newline, even at
-  // the table edge where there is no row to move to.
+  // Ctrl+Enter / Ctrl+Shift+Enter: move caret to the cell below/above.
+  // Handled locally because the contenteditable cell would otherwise eat
+  // the Enter (inserting a <br>) before Logseq's command-shortcut
+  // dispatcher sees it. The matching commands are also registered with
+  // Logseq so they appear in the command palette / keymap UI.
   root.addEventListener('keydown', (e) => {
     if (e.key !== 'Enter' || !e.ctrlKey) return
     const cell = e.target.closest && e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
     if (!cell) return
     e.preventDefault(); e.stopPropagation()
-    const table = cell.closest('table.lsp-mdt')
-    const tr = cell.closest('tr')
-    const rows = Array.from(table.querySelectorAll('tr'))
-    const colIdx = Array.from(tr.querySelectorAll('th,td')).indexOf(cell)
-    const target = rows[rows.indexOf(tr) + (e.shiftKey ? -1 : 1)]
-    const next = target && target.querySelectorAll('th,td')[colIdx]
-    if (next) caretToEnd(next)
+    moveCaretInFocusedTableCell(e.shiftKey ? 'up' : 'down')
   }, true)
 
   // Force plain-text paste so markup can't smuggle structure into a cell.

@@ -3,7 +3,7 @@ import '@logseq/libs'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
-import { attachInlineEditing, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
+import { attachInlineEditing, moveCaretInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
 import i18n from './locales/i18n'
 import './index.css'
 
@@ -125,6 +125,22 @@ if (isInBrowser) {
       }
 
       logseqEditor.registerSlashCommand('Markdown Table Editor', insertEmptyTableCallback)
+
+      // Row caret navigation inside an inline table cell. Registered so
+      // the commands appear in Logseq's command palette / keymap UI and
+      // can be assigned a host-level shortcut. The default Ctrl+Enter /
+      // Ctrl+Shift+Enter behaviour is still driven by a local keydown
+      // handler in `attachInlineEditing` (the contenteditable cell would
+      // otherwise eat Enter before Logseq's dispatcher saw it), so any
+      // shortcut assigned here fires in addition to the built-in keys.
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-move-caret-down',
+        label: i18n.t('Markdown table: move caret to cell below')
+      }, () => moveCaretInFocusedTableCell('down'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-move-caret-up',
+        label: i18n.t('Markdown table: move caret to cell above')
+      }, () => moveCaretInFocusedTableCell('up'))
 
       // Inline block renderer: replace Logseq's native view for markdown-table
       // blocks with an editable table. Host-mounted via the experimental
