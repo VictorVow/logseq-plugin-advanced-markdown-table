@@ -15,6 +15,12 @@ const logseqEditor = logseq.Editor
 
 const isInBrowser = process.env.REACT_APP_ENV === 'browser'
 
+const applyTheme = (mode) => {
+  const isDark = mode === 'dark'
+  document.documentElement.classList.toggle('dark', isDark)
+  document.body.classList.toggle('dark', isDark)
+}
+
 // Settings schema
 const settingsSchema = [
   {
@@ -34,6 +40,8 @@ const bootEditor = (input, blockId) => {
 }
 
 if (isInBrowser) {
+  applyTheme(window.matchMedia &&
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')
   bootEditor(longTables, 111)
 } else {
   logseq.useSettingsSchema(settingsSchema)
@@ -41,6 +49,10 @@ if (isInBrowser) {
   logseq.ready().then(() => {
     logseq.App.getUserConfigs().then(configs => {
       i18n.changeLanguage(configs.preferredLanguage || 'en')
+      applyTheme(configs.preferredThemeMode)
+      if (typeof logseq.App.onThemeModeChanged === 'function') {
+        logseq.App.onThemeModeChanged(({ mode }) => applyTheme(mode))
+      }
       // padding-left: var(--ls-left-sidebar-width);
       logseq.provideStyle(`
         iframe#logseq-markdown-table.lsp-iframe-sandbox {

@@ -136,7 +136,7 @@ const App = ({ content, tables, blockId }) => {
     <div className="w-screen h-screen flex flex-col justify-center items-center">
       <div className="w-screen h-screen absolute" style={{ background: 'rgba(0, 0, 0, .3)', zIndex: -1 }} onClick={onClickCancel}></div>
       <div
-        className="w-2/3 flex flex-col bg-white rounded-lg shadow-lg"
+        className="w-2/3 flex flex-col bg-white dark:bg-gray-800 rounded-lg shadow-lg"
         style={{
           maxHeight: '80%',
           transform: `translate(${position.x}px, ${position.y}px)`,
@@ -145,12 +145,12 @@ const App = ({ content, tables, blockId }) => {
       >
         {/* Draggable Header */}
         <div
-          className="flex items-center justify-center py-2 px-4 bg-gray-100 rounded-t-lg border-b border-gray-200"
+          className="flex items-center justify-center py-2 px-4 bg-gray-100 dark:bg-gray-900 rounded-t-lg border-b border-gray-200 dark:border-gray-700"
           style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
           onMouseDown={handleMouseDown}
         >
-          <DragOutlined className="text-gray-500 mr-2" />
-          <span className="text-gray-600 text-sm select-none">{t('Drag to move')}</span>
+          <DragOutlined className="text-gray-500 dark:text-gray-400 mr-2" />
+          <span className="text-gray-600 dark:text-gray-300 text-sm select-none">{t('Drag to move')}</span>
         </div>
 
         {/* Table Content */}
@@ -160,14 +160,14 @@ const App = ({ content, tables, blockId }) => {
               arrAfterSplitByTable?.map((node, index) => {
                 return node?.type === 'table'
                   ? (<TableEditor className="my-2" content={node?.str} key={index} ref={dom => setTableEditorRef(index, dom)} />)
-                  : (<div className="bg-gray-400 text-gray-300 my-3 rounded px-1 py-2" key={index} style={{ whiteSpace: 'pre-line' }}>{node.str}</div>)
+                  : (<div className="bg-gray-400 dark:bg-gray-700 text-gray-300 dark:text-gray-200 my-3 rounded px-1 py-2" key={index} style={{ whiteSpace: 'pre-line' }}>{node.str}</div>)
               })
             }
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between p-3 border-t border-gray-200">
+        <div className="flex items-center justify-between p-3 border-t border-gray-200 dark:border-gray-700">
           <Button ghost className="rounded flex items-center" icon={<PlusOutlined />} onClick={onClickAdd}>{t('Add New Table')}</Button>
           <div className="flex flex-row">
             <Button className="mr-1 rounded" onClick={onClickCancel}>{t('Cancel')}</Button>

@@ -17,7 +17,7 @@ const ToolBar = () => {
   }
 
   return (
-    <div className="mb-2 space-x-2 bg-white inline-flex px-3 py-1 rounded-md shadow-sm">
+    <div className="mb-2 space-x-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 inline-flex px-3 py-1 rounded-md shadow-sm">
       <Tooltip title={t('insert row above')} arrowPointAtCenter placement="topLeft">
         <InsertRowAboveOutlined className="text-xl cursor-pointer hover:opacity-70" onMouseDown={e => handleButtonClick(e, 'insert-row-above')} />
       </Tooltip>
@@ -28,7 +28,7 @@ const ToolBar = () => {
         <DeleteRowOutlined className="text-xl cursor-pointer hover:opacity-70" onMouseDown={e => handleButtonClick(e, 'delete-row')} />
       </Tooltip>
 
-      <div className="border-l border-gray-300"></div>
+      <div className="border-l border-gray-300 dark:border-gray-600"></div>
 
       <Tooltip title={t('insert column before')} arrowPointAtCenter placement="topLeft">
         <InsertRowLeftOutlined className="text-xl cursor-pointer hover:opacity-70" onMouseDown={e => handleButtonClick(e, 'insert-column-above')} />
