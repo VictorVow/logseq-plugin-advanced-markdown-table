@@ -398,9 +398,9 @@ const buildItems = (root, opts, cell) => {
   const L = opts.menuLabels || {}
   const items = [
     { icon: ICONS.insertRowAbove, label: L.insertRowAbove || 'Insert row above', enabled: rowIdx >= 1,
-      run: m => tableOps.insertRowAbove(m, rowIdx) },
+      shortcut: 'Alt+Shift+Up', run: m => tableOps.insertRowAbove(m, rowIdx) },
     { icon: ICONS.insertRowBelow, label: L.insertRowBelow || 'Insert row below', enabled: true,
-      run: m => tableOps.insertRowBelow(m, rowIdx) },
+      shortcut: 'Alt+Shift+Down', run: m => tableOps.insertRowBelow(m, rowIdx) },
     { icon: ICONS.moveRowUp, label: L.moveRowUp || 'Move row up', enabled: rowIdx >= 2,
       run: m => tableOps.moveRowUp(m, rowIdx) },
     { icon: ICONS.moveRowDown, label: L.moveRowDown || 'Move row down', enabled: rowIdx >= 1 && rowIdx < rowCount - 1,
@@ -409,9 +409,9 @@ const buildItems = (root, opts, cell) => {
       run: m => tableOps.deleteRow(m, rowIdx) },
     { sep: true },
     { icon: ICONS.insertColLeft, label: L.insertColLeft || 'Insert column left', enabled: true,
-      run: m => tableOps.insertColLeft(m, rowIdx, colIdx) },
+      shortcut: 'Alt+Shift+Left', run: m => tableOps.insertColLeft(m, rowIdx, colIdx) },
     { icon: ICONS.insertColRight, label: L.insertColRight || 'Insert column right', enabled: true,
-      run: m => tableOps.insertColRight(m, rowIdx, colIdx) },
+      shortcut: 'Alt+Shift+Right', run: m => tableOps.insertColRight(m, rowIdx, colIdx) },
     { icon: ICONS.moveColLeft, label: L.moveColLeft || 'Move column left', enabled: colIdx >= 1,
       run: m => tableOps.moveColLeft(m, rowIdx, colIdx) },
     { icon: ICONS.moveColRight, label: L.moveColRight || 'Move column right', enabled: colIdx < colCount - 1,
@@ -592,6 +592,11 @@ const openContextMenu = (root, opts, cell, ev) => {
     if (it.sep) { const s = doc.createElement('div'); s.className = 'lsp-mdt-menu-sep'; menu.appendChild(s); return }
     const mi = doc.createElement('div')
     mi.className = 'lsp-mdt-menu-item' + (it.enabled ? '' : ' disabled')
+    // Native tooltip surfaces the keybind on hover for items that have
+    // one. Reflects the hardcoded default in `attachInlineEditing`; an
+    // extra shortcut the user assigned via Logseq's keymap UI would
+    // fire too, but isn't shown here.
+    if (it.shortcut) mi.title = it.shortcut
     const ic = doc.createElement('span')
     ic.className = 'lsp-mdt-menu-icon'
     ic.innerHTML = it.icon || ''
