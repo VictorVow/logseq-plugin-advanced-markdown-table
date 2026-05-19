@@ -206,6 +206,7 @@ if (isInBrowser) {
             background: var(--ls-tertiary-background-color);
             color: var(--ls-primary-text-color);
           }
+          .lsp-mdtable-renderer .lsp-mdtable-fullscreen { margin-left: 6px; }
           .lsp-mdt-menu {
             position: fixed; z-index: 2147483647; min-width: 168px;
             padding: 4px; border-radius: 6px;
@@ -329,6 +330,16 @@ if (isInBrowser) {
               className: 'lsp-mdtable-edit',
               onClick: () => commandCallback({ uuid: id }) // existing modal flow
             }, i18n.t('Edit table')))
+            children.push(React.createElement('button', {
+              key: 'fullscreen',
+              className: 'lsp-mdtable-edit lsp-mdtable-fullscreen',
+              onClick: () => {
+                // App.jsx reads lastFullscreen once on mount, so flipping it
+                // before opening the modal makes it launch full-screen.
+                try { logseq.updateSettings({ lastFullscreen: true }) } catch (e) { /* noop */ }
+                commandCallback({ uuid: id })
+              }
+            }, i18n.t('Full screen')))
             const editable = logseq.settings?.inlineEditable !== false
             const dbRaw = Number(logseq.settings?.inlineEditDebounceMs)
             const debounceMs = Number.isFinite(dbRaw) && dbRaw >= 0 ? dbRaw : 500
