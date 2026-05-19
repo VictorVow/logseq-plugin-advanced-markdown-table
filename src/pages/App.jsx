@@ -25,7 +25,20 @@ const App = ({ content, tables, blockId }) => {
   const [isDragging, setIsDragging] = useState(false)
   const dragStartRef = useRef({ x: 0, y: 0 })
 
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  // Full-screen preference persists across opens via logseq settings
+  // (internal state, not added to the settings schema) until toggled off.
+  const [isFullscreen, setIsFullscreen] = useState(
+    () => !isInBrowser && window.logseq?.settings?.lastFullscreen === true
+  )
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(prev => {
+      const next = !prev
+      if (!isInBrowser) {
+        try { logseq.updateSettings({ lastFullscreen: next }) } catch (e) { /* noop */ }
+      }
+      return next
+    })
+  }, [])
 
   const setTableEditorRef = (index, dom) => {
     tableEditorMapRef.current = {
@@ -180,7 +193,7 @@ const App = ({ content, tables, blockId }) => {
             <Button
               className="mr-2 rounded flex items-center"
               icon={isFullscreen ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-              onClick={() => setIsFullscreen(v => !v)}
+              onClick={toggleFullscreen}
             >{isFullscreen ? t('Exit full screen') : t('Full screen')}</Button>
             <Button ghost className="rounded flex items-center" icon={<PlusOutlined />} onClick={onClickAdd}>{t('Add New Table')}</Button>
           </div>
