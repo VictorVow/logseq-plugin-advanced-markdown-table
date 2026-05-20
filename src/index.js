@@ -260,6 +260,24 @@ if (isInBrowser) {
             padding: 8px 12px !important; font-size: 14px;
           }
           .lsp-mdtable-renderer:fullscreen .lsp-mdtable-text { font-size: 14px; }
+          /* Maximise: same look as fullscreen, but bounded by Logseq's window
+             rather than the OS desktop. The renderer is reparented to <body>
+             so ancestor transforms/overflow can't constrain this overlay. */
+          .lsp-mdtable-renderer.lsp-mdt-max {
+            position: fixed; inset: 0; z-index: 2147483645;
+            margin: 0; padding: 24px 32px;
+            background: var(--ls-primary-background-color, #fff);
+            overflow: auto; box-sizing: border-box;
+          }
+          .lsp-mdtable-renderer.lsp-mdt-max .lsp-mdtable-scroll { overflow: auto; }
+          .lsp-mdtable-renderer.lsp-mdt-max table.lsp-mdt {
+            width: 100% !important; min-width: max-content;
+          }
+          .lsp-mdtable-renderer.lsp-mdt-max table.lsp-mdt th,
+          .lsp-mdtable-renderer.lsp-mdt-max table.lsp-mdt td {
+            padding: 8px 12px !important; font-size: 14px;
+          }
+          .lsp-mdtable-renderer.lsp-mdt-max .lsp-mdtable-text { font-size: 14px; }
           .lsp-mdt-menu {
             position: fixed; z-index: 2147483647; min-width: 168px;
             padding: 4px; border-radius: 6px;
@@ -410,7 +428,9 @@ if (isInBrowser) {
                       pinToolbar: i18n.t('Pin toolbar'),
                       unpinToolbar: i18n.t('Unpin toolbar'),
                       fullScreen: i18n.t('Full screen'),
-                      exitFullScreen: i18n.t('Exit full screen')
+                      exitFullScreen: i18n.t('Exit full screen'),
+                      maximise: i18n.t('Maximise'),
+                      exitMaximise: i18n.t('Exit maximise')
                     }
                   }
                   attachInlineEditing(el, inlineOpts)

@@ -11,6 +11,8 @@
   "readable data": "可读化（对齐表格源码）",
   "Full screen": "全屏",
   "Exit full screen": "退出全屏",
+  "Maximise": "最大化",
+  "Exit maximise": "退出最大化",
   "Move row up": "上移行",
   "Move row down": "下移行",
   "Move column left": "左移列",

@@ -11,6 +11,8 @@
   "readable data": "readable data (align table source)",
   "Full screen": "Full screen",
   "Exit full screen": "Exit full screen",
+  "Maximise": "Maximise",
+  "Exit maximise": "Exit maximise",
   "Move row up": "Move row up",
   "Move row down": "Move row down",
   "Move column left": "Move column left",
