@@ -241,28 +241,9 @@ if (isInBrowser) {
             outline: 2px solid var(--ls-active-primary-color, #2563eb) !important;
             outline-offset: -2px;
           }
-          /* Full-screen view uses the browser's native Fullscreen API so the
-             element overlays Logseq's UI regardless of ancestor stacking /
-             transform contexts. The DOM doesn't move, so inline editing,
-             the toolbar (mounted into the fullscreen element when active),
-             drag-drop and right-click menus all keep working. */
-          .lsp-mdtable-renderer:fullscreen {
-            margin: 0; padding: 24px 32px;
-            background: var(--ls-primary-background-color, #fff);
-            overflow: auto; box-sizing: border-box;
-          }
-          .lsp-mdtable-renderer:fullscreen .lsp-mdtable-scroll { overflow: auto; }
-          .lsp-mdtable-renderer:fullscreen table.lsp-mdt {
-            width: 100% !important; min-width: max-content;
-          }
-          .lsp-mdtable-renderer:fullscreen table.lsp-mdt th,
-          .lsp-mdtable-renderer:fullscreen table.lsp-mdt td {
-            padding: 8px 12px !important; font-size: 14px;
-          }
-          .lsp-mdtable-renderer:fullscreen .lsp-mdtable-text { font-size: 14px; }
-          /* Maximise: same look as fullscreen, but bounded by Logseq's window
-             rather than the OS desktop. The renderer is reparented to <body>
-             so ancestor transforms/overflow can't constrain this overlay. */
+          /* Maximise: expand the renderer to fill Logseq's window. The
+             renderer is reparented to <body> so ancestor transforms/overflow
+             can't constrain this overlay. */
           .lsp-mdtable-renderer.lsp-mdt-max {
             position: fixed; inset: 0; z-index: 2147483645;
             margin: 0; padding: 24px 32px;
@@ -427,8 +408,6 @@ if (isInBrowser) {
                       sortColDesc: i18n.t('Sort column descending'),
                       pinToolbar: i18n.t('Pin toolbar'),
                       unpinToolbar: i18n.t('Unpin toolbar'),
-                      fullScreen: i18n.t('Full screen'),
-                      exitFullScreen: i18n.t('Exit full screen'),
                       maximise: i18n.t('Maximise'),
                       exitMaximise: i18n.t('Exit maximise')
                     }

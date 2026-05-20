@@ -64,13 +64,10 @@ export const fitInlineTableWidth = (root) => {
     s.style.maxWidth = '0px'      // reflow to natural layout
     s.style.paddingRight = ''     // measure true overflow without our spacer
   })
-  // In fullscreen the renderer itself defines the available width; the
+  // When maximised the renderer itself defines the available width; the
   // Logseq block clip ancestor is irrelevant. Let the scroll wrapper fill
-  // the fullscreen viewport so the table can render edge-to-edge.
-  const doc = root.ownerDocument
-  const fsEl = doc.fullscreenElement || doc.webkitFullscreenElement
-  const maximised = root.classList.contains('lsp-mdt-max')
-  if ((fsEl && fsEl.contains(root)) || maximised) {
+  // the window so the table can render edge-to-edge.
+  if (root.classList.contains('lsp-mdt-max')) {
     scrolls.forEach(s => {
       s.style.maxWidth = '100%'
       if (s.scrollWidth > s.clientWidth + 1) {
@@ -111,8 +108,6 @@ const bindResizeRefit = (root) => {
     }, 100)
   }
   win.addEventListener('resize', refitAll)
-  doc.addEventListener('fullscreenchange', refitAll)
-  doc.addEventListener('webkitfullscreenchange', refitAll)
 }
 
 // Called from the renderer's ref on every (re-)mount, regardless of whether
@@ -435,20 +430,15 @@ const ICONS = {
   sortColAsc:  SVG('<path d="M11 5h3M11 10h6M11 15h9"/><polyline points="4 8 7 5 10 8"/><line x1="7" y1="5" x2="7" y2="19"/>'),
   sortColDesc: SVG('<path d="M11 5h9M11 10h6M11 15h3"/><polyline points="4 16 7 19 10 16"/><line x1="7" y1="5" x2="7" y2="19"/>'),
   pin: SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z"/>'),
-  fullscreen:     SVG('<polyline points="4 9 4 4 9 4"/><polyline points="20 9 20 4 15 4"/><polyline points="4 15 4 20 9 20"/><polyline points="20 15 20 20 15 20"/>'),
-  exitFullscreen: SVG('<polyline points="9 4 9 9 4 9"/><polyline points="15 4 15 9 20 9"/><polyline points="4 15 9 15 9 20"/><polyline points="20 15 15 15 15 20"/>'),
   // Maximise = expand to Logseq's window bounds (covers sidebars/blocks).
-  // Distinct glyph from fullscreen so the two are distinguishable in the bar:
-  // a framed box with inward arrows.
+  // A framed box with inward arrows; the exit variant has the arrows outward.
   maximise:     SVG('<rect x="3" y="3" width="18" height="18" rx="1"/><polyline points="8 13 8 16 11 16"/><polyline points="16 11 16 8 13 8"/>'),
   exitMaximise: SVG('<rect x="3" y="3" width="18" height="18" rx="1"/><polyline points="13 8 16 8 16 11"/><polyline points="11 16 8 16 8 13"/>')
 }
 
-// Overlay host for popovers/toolbars: when the renderer is in native
-// fullscreen, doc.body sits beneath the fullscreen element's top layer and
-// our popups would be invisible. Mount them inside the fullscreen element
-// in that case so they share the top layer.
-const overlayHost = (doc) => doc.fullscreenElement || doc.webkitFullscreenElement || doc.body
+// Overlay host for popovers/toolbars. The renderer is reparented to <body>
+// while maximised, so mounting popups on <body> keeps them above it.
+const overlayHost = (doc) => doc.body
 
 const closeMenu = (doc) => {
   const el = doc.querySelector('.lsp-mdt-menu')
@@ -501,29 +491,6 @@ const buildItems = (root, opts, cell) => {
 }
 
 const isPinned = (opts) => !!(opts.isPinned && opts.isPinned())
-
-// Full-screen toggle item; lives next to Pin/Unpin in both the right-click
-// menu and the pinned toolbar. Uses the native Fullscreen API on the
-// renderer root so the DOM doesn't move and all editing hooks stay bound.
-// `after(nowFs)` lets the surface refresh its item state.
-const fullScreenItem = (root, opts, after) => {
-  const doc = root.ownerDocument
-  const fsEl = doc.fullscreenElement || doc.webkitFullscreenElement
-  const isFs = fsEl === root
-  const L = opts.menuLabels || {}
-  return {
-    icon: isFs ? ICONS.exitFullscreen : ICONS.fullscreen,
-    label: isFs ? (L.exitFullScreen || 'Exit full screen') : (L.fullScreen || 'Full screen'),
-    enabled: true,
-    action: () => {
-      try {
-        if (isFs) (doc.exitFullscreen || doc.webkitExitFullscreen).call(doc)
-        else (root.requestFullscreen || root.webkitRequestFullscreen).call(root)
-      } catch (e) { console.warn('[mdtable] fullscreen toggle failed', e) }
-      if (after) after(!isFs)
-    }
-  }
-}
 
 // Maximise = expand the renderer to fill Logseq's window (covering sidebars
 // and other blocks), without entering OS-level fullscreen. Implementation:
@@ -580,7 +547,7 @@ const bindMaximiseEsc = (doc) => {
   }, true)
 }
 
-// Maximise toggle item; mirrors fullScreenItem's shape.
+// Maximise toggle item; lives next to Pin/Unpin in both surfaces.
 const maximiseItem = (root, opts, after) => {
   const max = isMaximised(root)
   const L = opts.menuLabels || {}
@@ -691,7 +658,6 @@ const buildToolbar = (root, opts, cell) => {
   const aRow = Array.from(cell.closest('table.lsp-mdt').querySelectorAll('tr')).indexOf(aTr)
   const aCol = Array.from(aTr.querySelectorAll('th,td')).indexOf(cell)
   const all = items.concat([{ sep: true },
-    fullScreenItem(root, opts, () => buildToolbar(root, opts, cell)),
     maximiseItem(root, opts, () => buildToolbar(root, opts, cell)),
     pinItem(opts, () => removeToolbar(doc))]) // pinned bar's toggle = unpin
 
@@ -728,7 +694,6 @@ const openContextMenu = (root, opts, cell, ev) => {
 
   const { items, ord } = buildItems(root, opts, cell)
   const all = items.concat([{ sep: true },
-    fullScreenItem(root, opts),
     maximiseItem(root, opts),
     pinItem(opts, (now) => { if (now) buildToolbar(root, opts, cell); else removeToolbar(doc) })])
 
