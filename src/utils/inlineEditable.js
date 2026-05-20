@@ -257,6 +257,40 @@ export const moveInFocusedTableCell = (which) => {
   doMoveOp(root, opts, cell, which)
 }
 
+// Delete the focused cell's row/column. `which` ∈ 'row' | 'col'. No-op
+// if focus isn't in a cell, if the row is the header (we need it to keep
+// the table valid markdown), or if the table only has one row/column left.
+export const deleteInFocusedTableCell = (which) => {
+  let hostDoc = null
+  try { hostDoc = (window.top || window.parent)?.document } catch (_) { /* cross-origin */ }
+  if (!hostDoc) return
+  const active = hostDoc.activeElement
+  const cell = active && active.closest && active.closest('table.lsp-mdt th, table.lsp-mdt td')
+  if (!cell) return
+  const root = cell.closest('.lsp-mdtable-renderer')
+  const opts = root && root._lspInlineOpts
+  if (!opts) return
+  const tableEl = cell.closest('table.lsp-mdt')
+  const tr = cell.closest('tr')
+  const rows = Array.from(tableEl.querySelectorAll('tr'))
+  const rowIdx = rows.indexOf(tr)
+  const cells = Array.from(tr.querySelectorAll('th,td'))
+  const colIdx = cells.indexOf(cell)
+  const ord = Array.from(root.querySelectorAll('table.lsp-mdt')).indexOf(tableEl)
+  let op, newRow = rowIdx, newCol = colIdx
+  if (which === 'row') {
+    if (rowIdx < 1 || rows.length < 2) return // protect header / last row
+    op = tableOps.deleteRow
+    if (newRow >= rows.length - 1) newRow = rows.length - 2
+  } else if (which === 'col') {
+    if (cells.length < 2) return
+    op = tableOps.deleteCol
+    if (newCol >= cells.length - 1) newCol = cells.length - 2
+  } else return
+  pendingToolbar.set(opts.blockId, { ord, rowIdx: newRow, colIdx: newCol })
+  commitStructural(root, opts, (m, i) => (i === ord ? op(m, rowIdx, colIdx) : m))
+}
+
 // Shared by the local Alt+Shift+Arrow handler and the registered move
 // commands. Stashes a `pendingToolbar` entry at the moved cell's new
 // position so `resumePinnedToolbar` follows the cell after re-render.

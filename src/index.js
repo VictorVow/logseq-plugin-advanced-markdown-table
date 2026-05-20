@@ -3,7 +3,7 @@ import '@logseq/libs'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
-import { attachInlineEditing, insertInFocusedTableCell, moveCaretInFocusedTableCell, moveInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
+import { attachInlineEditing, deleteInFocusedTableCell, insertInFocusedTableCell, moveCaretInFocusedTableCell, moveInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
 import i18n from './locales/i18n'
 import './index.css'
 
@@ -169,6 +169,20 @@ if (isInBrowser) {
         label: i18n.t('Markdown table: insert column left'),
         keybinding: { binding: 'ctrl+alt+shift+left' }
       }, () => insertInFocusedTableCell('colLeft'))
+
+      // Row/column delete. No local keydown handler covers these — the
+      // bindings below are the only way to trigger them via keyboard
+      // (besides the right-click menu / pinned toolbar).
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-delete-row',
+        label: i18n.t('Markdown table: delete row'),
+        keybinding: { binding: 'ctrl+backspace' }
+      }, () => deleteInFocusedTableCell('row'))
+      logseq.App.registerCommandPalette({
+        key: 'mdtable-delete-col',
+        label: i18n.t('Markdown table: delete column'),
+        keybinding: { binding: 'ctrl+delete' }
+      }, () => deleteInFocusedTableCell('col'))
 
       // Row/column move. Defaults match the local Alt+Shift+Arrow handler
       // in `attachInlineEditing`.
