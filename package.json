@@ -1,13 +1,13 @@
 {
-  "name": "logseq-inline-markdown-table",
+  "name": "logseq-advanced-markdown-table",
   "version": "1.0.0",
   "private": true,
-  "description": "inline markdown table editor for logseq",
+  "description": "Advanced Markdown table editor.",
   "main": "build/index.html",
   "homepage": "./",
   "logseq": {
-    "title": "Inline Markdown Table Editor",
-    "id": "logseq-inline-markdown-table",
+    "title": "Advanced Markdown Table Editor",
+    "id": "logseq-advanced-markdown-table",
     "icon": "./logo.png"
   },
   "scripts": {
