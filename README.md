@@ -73,6 +73,8 @@ All shortcuts below are registered as Logseq commands, so you can rebind them fr
 | Move caret to cell left  | `Ctrl+Alt+Left`                    |
 | Move caret to cell right | `Ctrl+Alt+Right`                   |
 
+`Tab` and `Shift+Tab` also move focus to the next / previous cell. These use the browser's native focus traversal (each cell is a tab stop), so they aren't registered as Logseq commands and can't be rebound from the Keymap UI.
+
 ### Insert rows & columns
 
 | Action              | Default                |
