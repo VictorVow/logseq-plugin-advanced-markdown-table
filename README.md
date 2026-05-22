@@ -62,7 +62,7 @@ Then load the project folder via **Load unpacked plugin** in Logseq.
 
 ## Keyboard shortcuts
 
-All shortcuts below are registered as Logseq commands, so you can rebind them from **Settings → Keymap** (search for _Markdown table_). The defaults are:
+The shortcuts below are scoped to a focused table cell — they don't fire when your caret is in a regular Logseq block, so they won't collide with Logseq's native chords (`Alt+Shift+Up` still moves the block, `Ctrl+Backspace` still deletes a word, etc.). The commands are also registered with Logseq (without a default global binding) so you can assign your own global hotkeys from **Settings → Keymap** (search for _Markdown table_). The in-cell defaults are:
 
 ### Caret navigation (inside a cell)
 

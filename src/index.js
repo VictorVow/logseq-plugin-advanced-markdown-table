@@ -119,92 +119,72 @@ if (isInBrowser) {
 
       logseqEditor.registerSlashCommand('Markdown Table Editor', insertEmptyTableCallback)
 
-      // Row/column caret navigation inside an inline table cell. A
-      // `keybinding` is required for these to show up in Logseq's Keymap
-      // UI (commands without one only appear in the command palette).
-      // Defaults mirror the local keydown handler in `attachInlineEditing`;
-      // since that local path swallows the keys before Logseq's dispatcher
-      // sees them, the registered binding is effectively a hint the user
-      // can rebind from Settings → Keymap.
+      // Table commands are registered WITHOUT a default `keybinding` so
+      // Logseq's global keymap dispatcher doesn't steal these chords outside
+      // a table cell (e.g. Alt+Shift+Up was intercepting Logseq's native
+      // "move block up"). The matching shortcuts are still wired up when
+      // focus is inside a cell, via capture-phase listeners in
+      // `attachInlineEditing` (including a delete row/col handler added
+      // there to cover ctrl+backspace / ctrl+delete). Users who want a
+      // global hotkey can assign one via Settings → Keymap.
       logseq.App.registerCommandPalette({
         key: 'mdtable-move-caret-down',
-        label: i18n.t('Markdown table: move caret to cell below'),
-        keybinding: { binding: 'ctrl+alt+down' }
+        label: i18n.t('Markdown table: move caret to cell below')
       }, () => moveCaretInFocusedTableCell('down'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-move-caret-up',
-        label: i18n.t('Markdown table: move caret to cell above'),
-        keybinding: { binding: 'ctrl+alt+up' }
+        label: i18n.t('Markdown table: move caret to cell above')
       }, () => moveCaretInFocusedTableCell('up'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-move-caret-left',
-        label: i18n.t('Markdown table: move caret to cell left'),
-        keybinding: { binding: 'ctrl+alt+left' }
+        label: i18n.t('Markdown table: move caret to cell left')
       }, () => moveCaretInFocusedTableCell('left'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-move-caret-right',
-        label: i18n.t('Markdown table: move caret to cell right'),
-        keybinding: { binding: 'ctrl+alt+right' }
+        label: i18n.t('Markdown table: move caret to cell right')
       }, () => moveCaretInFocusedTableCell('right'))
 
-      // Row/column insertion. Defaults match the local Alt+Ctrl+Shift+Arrow
-      // handler in `attachInlineEditing`.
       logseq.App.registerCommandPalette({
         key: 'mdtable-insert-row-below',
-        label: i18n.t('Markdown table: insert row below'),
-        keybinding: { binding: 'ctrl+alt+shift+down' }
+        label: i18n.t('Markdown table: insert row below')
       }, () => insertInFocusedTableCell('rowBelow'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-insert-row-above',
-        label: i18n.t('Markdown table: insert row above'),
-        keybinding: { binding: 'ctrl+alt+shift+up' }
+        label: i18n.t('Markdown table: insert row above')
       }, () => insertInFocusedTableCell('rowAbove'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-insert-col-right',
-        label: i18n.t('Markdown table: insert column right'),
-        keybinding: { binding: 'ctrl+alt+shift+right' }
+        label: i18n.t('Markdown table: insert column right')
       }, () => insertInFocusedTableCell('colRight'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-insert-col-left',
-        label: i18n.t('Markdown table: insert column left'),
-        keybinding: { binding: 'ctrl+alt+shift+left' }
+        label: i18n.t('Markdown table: insert column left')
       }, () => insertInFocusedTableCell('colLeft'))
 
-      // Row/column delete. No local keydown handler covers these — the
-      // bindings below are the only way to trigger them via keyboard
-      // (besides the right-click menu / pinned toolbar).
       logseq.App.registerCommandPalette({
         key: 'mdtable-delete-row',
-        label: i18n.t('Markdown table: delete row'),
-        keybinding: { binding: 'ctrl+backspace' }
+        label: i18n.t('Markdown table: delete row')
       }, () => deleteInFocusedTableCell('row'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-delete-col',
-        label: i18n.t('Markdown table: delete column'),
-        keybinding: { binding: 'ctrl+delete' }
+        label: i18n.t('Markdown table: delete column')
       }, () => deleteInFocusedTableCell('col'))
 
-      // Row/column move. Defaults match the local Alt+Shift+Arrow handler
-      // in `attachInlineEditing`.
       logseq.App.registerCommandPalette({
         key: 'mdtable-move-row-up',
-        label: i18n.t('Markdown table: move row up'),
-        keybinding: { binding: 'alt+shift+up' }
+        label: i18n.t('Markdown table: move row up')
       }, () => moveInFocusedTableCell('rowUp'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-move-row-down',
-        label: i18n.t('Markdown table: move row down'),
-        keybinding: { binding: 'alt+shift+down' }
+        label: i18n.t('Markdown table: move row down')
       }, () => moveInFocusedTableCell('rowDown'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-move-col-left',
-        label: i18n.t('Markdown table: move column left'),
-        keybinding: { binding: 'alt+shift+left' }
+        label: i18n.t('Markdown table: move column left')
       }, () => moveInFocusedTableCell('colLeft'))
       logseq.App.registerCommandPalette({
         key: 'mdtable-move-col-right',
-        label: i18n.t('Markdown table: move column right'),
-        keybinding: { binding: 'alt+shift+right' }
+        label: i18n.t('Markdown table: move column right')
       }, () => moveInFocusedTableCell('colRight'))
 
       // Inline block renderer: replace Logseq's native view for markdown-table

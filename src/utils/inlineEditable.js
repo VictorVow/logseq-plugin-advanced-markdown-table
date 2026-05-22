@@ -1045,6 +1045,21 @@ export const attachInlineEditing = (root, opts) => {
     doMoveOp(root, opts, cell, which)
   }, true)
 
+  // Ctrl+Backspace / Ctrl+Delete: delete the focused row / column. Local
+  // handler so the chord only fires inside a cell — outside, Logseq's
+  // native delete-word behavior is preserved.
+  root.addEventListener('keydown', (e) => {
+    if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return
+    let which = null
+    if (e.key === 'Backspace') which = 'row'
+    else if (e.key === 'Delete') which = 'col'
+    if (!which) return
+    const cell = e.target.closest && e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
+    if (!cell) return
+    e.preventDefault(); e.stopPropagation()
+    deleteInFocusedTableCell(which)
+  }, true)
+
   // Force plain-text paste so markup can't smuggle structure into a cell.
   root.addEventListener('paste', (e) => {
     const cell = e.target.closest('table.lsp-mdt th, table.lsp-mdt td')
