@@ -13,7 +13,8 @@
   "scripts": {
     "start": "cross-env NODE_OPTIONS=--openssl-legacy-provider REACT_APP_ENV=browser node scripts/start.js",
     "build": "cross-env NODE_OPTIONS=--openssl-legacy-provider node scripts/build.js",
-    "test": "cross-env NODE_OPTIONS=--openssl-legacy-provider REACT_APP_ENV=browser node scripts/test.js"
+    "test": "cross-env NODE_OPTIONS=--openssl-legacy-provider REACT_APP_ENV=browser node scripts/test.js",
+    "build:dev": "npm run build && node scripts/make-dev-plugin.js"
   },
   "dependencies": {
     "@ant-design/icons": "^4.7.0",

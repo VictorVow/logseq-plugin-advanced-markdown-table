@@ -132,12 +132,24 @@ Reload the plugin after changing any of these.
 ## Development
 
 ```shell
-npm install     # install deps
-npm start       # browser dev mode (no Logseq host)
-npm run build   # produce build/ for loading as unpacked plugin
+npm install       # install deps
+npm start         # browser dev mode (no Logseq host)
+npm run build     # produce build/ for loading as unpacked plugin
+npm run build:dev # build, then create ./dev/ — a dev plugin root with a
+                  # distinct id ("…-dev") so you can keep the marketplace
+                  # release installed and side-load this checkout at the
+                  # same time.
 ```
 
-After editing source, run `npm run build` and reload the plugin in Logseq (**Settings → Plugins → ⋯ → Reload**).
+### Side-loading the dev build alongside the marketplace release
+
+Logseq identifies plugins by `logseq.id`, so it refuses to load two copies with the same id at once — meaning a marketplace install of this plugin blocks **Load unpacked plugin** from accepting this repo's `build/` directly. The `build:dev` script works around that by generating `./dev/` with a `…-dev` suffixed id, a `(Dev)`-prefixed title, and symlinks back to the real `build/` and `logo.png`.
+
+1. `npm run build:dev`
+2. In Logseq: **Settings → Plugins → Load unpacked plugin → select `./dev/`**.
+3. Both plugins now appear in the list — the marketplace one and `(Dev) Advanced Markdown Table Editor`.
+
+After editing source, re-run `npm run build` (or `build:dev`) and reload the plugin in Logseq (**Settings → Plugins → ⋯ → Reload**).
 
 ## License
 

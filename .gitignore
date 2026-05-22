@@ -11,6 +11,9 @@
 # production
 /build
 
+# Dev-only plugin root for side-loading alongside the marketplace install
+/dev
+
 # misc
 .DS_Store
 .env.local
