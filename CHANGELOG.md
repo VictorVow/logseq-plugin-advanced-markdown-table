@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/VictorVow/logseq-plugin-advanced-markdown-table/compare/v1.0.0...v1.1.0) (2026-05-22)
+
+
+### Bug Fixes
+
+* **keybindings:** scope table shortcuts to focused cells ([8a1b474](https://github.com/VictorVow/logseq-plugin-advanced-markdown-table/commit/8a1b4747eb13ff50aff09c8ec3b405958e800eb1))
+
+
+### Features
+
+* **dev:** add build:dev for side-loading alongside marketplace install ([341b4d6](https://github.com/VictorVow/logseq-plugin-advanced-markdown-table/commit/341b4d6d1ac8dd21c9676972c25b077f9cf0e0c1))
+
 # [1.9.0](https://github.com/haydenull/logseq-plugin-markdown-table/compare/v1.8.1...v1.9.0) (2026-01-29)
 
 
