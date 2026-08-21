@@ -3,7 +3,7 @@ import '@logseq/libs'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
-import { attachInlineEditing, deleteInFocusedTableCell, insertInFocusedTableCell, moveCaretInFocusedTableCell, moveInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
+import { attachInlineEditing, deleteInFocusedTableCell, insertInFocusedTableCell, moveCaretInFocusedTableCell, moveInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar, syncCellText } from './utils/inlineEditable'
 import i18n from './locales/i18n'
 import './index.css'
 
@@ -359,16 +359,21 @@ if (isInBrowser) {
               // Inline styles beat Logseq's higher-specificity prose/table
               // rules (which were overriding our class-based stylesheet).
               const cellStyle = { textAlign: 'left', verticalAlign: 'top', whiteSpace: 'pre' }
+              // Cells carry NO `children` prop: text is applied by the
+              // syncCellText ref instead (uncontrolled contenteditable). If
+              // React owned the text child, the updateBlock echo re-render
+              // could rewrite it via setTextContent and yank the caret to the
+              // start of the cell (worst for empty cells).
               return React.createElement('div',
                 { key: 's' + si, className: 'lsp-mdtable-scroll' },
                 React.createElement('table', { className: 'lsp-mdt' }, [
                   React.createElement('thead', { key: 'h' },
                     React.createElement('tr', null,
-                      head.map((c, i) => React.createElement('th', { key: i, style: cellStyle }, c)))),
+                      head.map((c, i) => React.createElement('th', { key: i, style: cellStyle, ref: (el) => syncCellText(el, c) })))),
                   React.createElement('tbody', { key: 'b' },
                     body.map((row, ri) => React.createElement('tr', { key: ri },
                       head.map((_, ci) =>
-                        React.createElement('td', { key: ci, style: cellStyle }, row[ci] ?? '')))))
+                        React.createElement('td', { key: ci, style: cellStyle, ref: (el) => syncCellText(el, row[ci] ?? '') })))))
                 ]))
             })
             const dbRaw = Number(logseq.settings?.inlineEditDebounceMs)

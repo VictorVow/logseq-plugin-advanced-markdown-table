@@ -7,10 +7,16 @@
 //
 // Two hazards are designed around here:
 //
-//  1. Caret jumps. Every updateBlock re-runs the block renderer. We never
-//     re-sync cell text from props; React reconciles the identical serialized
-//     text as a no-op, so the live contentEditable DOM (and caret) is left
-//     untouched. We also ignore the echo of our own write.
+//  1. Caret jumps. Every updateBlock re-runs the block renderer, so the React
+//     tree is reconciled against the freshly-written content. Cells are
+//     rendered WITHOUT a `children` prop (see syncCellText): React never owns
+//     their live text, so it can never rewrite it and displace the caret. The
+//     previous design relied on React treating identical serialized text as a
+//     no-op, which broke for empty cells — `setTextContent(node, '')`
+//     rebuilds the text child and the caret jumps to the start of the cell.
+//     Initial text is applied once via the cell ref, and only when it differs
+//     from the live DOM, so the normal echo re-render is a no-op. We also
+//     ignore the echo of our own write.
 //
 //  2. Structural corruption. A literal `|` or stray `\r` typed into a cell
 //     would break re-parsing (the parser splits naively on `|`). Cells are
@@ -33,6 +39,20 @@ const pendingToolbar = new Map()
 // pushed off-screen. CSS alone can't fix this without styling that unknown
 // ancestor, so we measure the real clipping ancestor and pin the scroll
 // box to a pixel width — the table then scrolls inside its own box.
+
+// Apply initial cell text via a cell ref. Cells are rendered without a
+// `children` prop (index.js) so React never manages their text: a cell has no
+// React-owned text child, `shouldSetTextContent` stays false, and React can
+// never call setTextContent on it during a re-render. That is what prevents
+// the caret jump for empty cells (see the header note). We write the text once
+// here, guarded by a comparison so the normal echo re-render (content === live
+// DOM text) is a no-op and the caret is left exactly where the user put it.
+// Structural ops (insert/delete/sort/move) produce genuinely different text,
+// which this overwrites; resumePinnedToolbar re-anchors the caret afterwards.
+export const syncCellText = (el, text) => {
+  if (!el) return
+  if (el.textContent !== text) el.textContent = text
+}
 
 const isScrollContainer = (cs) =>
   /(auto|scroll|hidden)/.test(cs.overflowX) || /(auto|scroll)/.test(cs.overflowY)
