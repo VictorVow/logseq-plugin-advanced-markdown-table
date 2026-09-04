@@ -287,6 +287,15 @@ if (isInBrowser) {
           .lsp-mdt-menu-item.disabled {
             opacity: .4; cursor: default; pointer-events: none;
           }
+          /* Info-only row (e.g. "Move caret to cell"): reference text, not
+             an action — no hover highlight, not clickable, lightly muted. */
+          .lsp-mdt-menu-item.info {
+            cursor: default; opacity: .7;
+          }
+          .lsp-mdt-menu-item.info:hover {
+            background: transparent; color: inherit;
+          }
+          .lsp-mdt-menu-item.info:hover .lsp-mdt-menu-icon { opacity: .8; }
           /* "Hide Keybindings" (toggle on): a subtle persistent state, not
              the full blue used for hover/press. Faint fill + a thin accent
              bar; hovering it still gets the normal blue press feedback. */
@@ -452,7 +461,8 @@ if (isInBrowser) {
                       maximise: i18n.t('Maximise'),
                       exitMaximise: i18n.t('Exit maximise'),
                       showKeybindings: i18n.t('Show Keybindings'),
-                      hideKeybindings: i18n.t('Hide Keybindings')
+                      hideKeybindings: i18n.t('Hide Keybindings'),
+                      moveCaretToCell: i18n.t('Move caret to cell')
                     }
                   }
                   attachInlineEditing(el, inlineOpts)

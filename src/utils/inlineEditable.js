@@ -479,6 +479,8 @@ const ICONS = {
   pin: SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z"/>'),
   // Keyboard outline: toggles the keybinding column in the right-click menu.
   keybindings: SVG('<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M8 14h8"/>'),
+  // Four-way arrows: caret navigation between cells (info-only menu row).
+  moveCaret: SVG('<polyline points="9 5 12 2 15 5"/><polyline points="9 19 12 22 15 19"/><polyline points="5 9 2 12 5 15"/><polyline points="19 9 22 12 19 15"/><line x1="12" y1="3" x2="12" y2="21"/><line x1="3" y1="12" x2="21" y2="12"/>'),
   // Maximise = expand to Logseq's window bounds (covers sidebars/blocks).
   // A framed box with inward arrows; the exit variant has the arrows outward.
   maximise:     SVG('<rect x="3" y="3" width="18" height="18" rx="1"/><polyline points="8 13 8 16 11 16"/><polyline points="16 11 16 8 13 8"/>'),
@@ -775,7 +777,16 @@ const openContextMenu = (root, opts, cell, ev, kbShownOverride) => {
     if (opts.setKeybindingsShown) opts.setKeybindingsShown(now)
     openContextMenu(root, opts, cell, ev, now)
   }
-  const all = items.concat([{ sep: true },
+  const L = opts.menuLabels || {}
+  // Info-only row: caret navigation has no menu action, but its chord is
+  // worth surfacing. Shown just under "Sort column descending" while the
+  // keybinding column is on; non-interactive.
+  const caretInfo = showKb
+    ? [{ info: true, icon: ICONS.moveCaret,
+         label: L.moveCaretToCell || 'Move caret to cell',
+         shortcut: 'Ctrl+Alt+Arrow key' }]
+    : []
+  const all = items.concat(caretInfo, [{ sep: true },
     maximiseItem(root, opts),
     keybindingsItem(showKb, opts.menuLabels, toggleKb),
     pinItem(opts, (now) => { if (now) buildToolbar(root, opts, cell); else removeToolbar(doc) })])
@@ -786,7 +797,8 @@ const openContextMenu = (root, opts, cell, ev, kbShownOverride) => {
     if (it.sep) { const s = doc.createElement('div'); s.className = 'lsp-mdt-menu-sep'; menu.appendChild(s); return }
     const mi = doc.createElement('div')
     mi.className = 'lsp-mdt-menu-item' +
-      (it.enabled ? '' : ' disabled') + (it.active ? ' active' : '')
+      (it.info ? ' info' : (it.enabled ? '' : ' disabled')) +
+      (it.active ? ' active' : '')
     // Native tooltip surfaces the keybind on hover for items that have
     // one. Reflects the hardcoded default in `attachInlineEditing`; an
     // extra shortcut the user assigned via Logseq's keymap UI would
