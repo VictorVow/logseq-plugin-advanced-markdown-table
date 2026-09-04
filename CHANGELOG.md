@@ -1,3 +1,16 @@
+# [1.2.0](https://github.com/VictorVow/logseq-plugin-advanced-markdown-table/compare/v1.1.0...v1.2.0) (2026-09-04)
+
+
+### Bug Fixes
+
+* **inline-edit:** stop caret jumping to cell start while typing ([dd3883a](https://github.com/VictorVow/logseq-plugin-advanced-markdown-table/commit/dd3883ab21306f49e0f4668c1073bc063884cbb1))
+
+
+### Features
+
+* **menu:** add "Show Keybindings" toggle to the cell right-click menu ([00abdf2](https://github.com/VictorVow/logseq-plugin-advanced-markdown-table/commit/00abdf2f9019ce402c9492215572fe76e9f3e6e3))
+* **menu:** list caret-nav chord when keybindings column is on ([ec31bce](https://github.com/VictorVow/logseq-plugin-advanced-markdown-table/commit/ec31bce58fbcc9f5dd8e710a238e8e019042a6e1))
+
 # [1.1.0](https://github.com/VictorVow/logseq-plugin-advanced-markdown-table/compare/v1.0.0...v1.1.0) (2026-05-22)
 
 
