@@ -47,6 +47,13 @@ const settingsSchema = [
     default: true,
     title: 'Pin inline table toolbar by default',
     description: 'When enabled, the inline table toolbar stays pinned above the focused table. You can still toggle pinning at runtime from the toolbar/right-click menu.'
+  },
+  {
+    key: 'menuShowKeybindings',
+    type: 'boolean',
+    default: false,
+    title: 'Show keybindings in the table right-click menu',
+    description: 'When enabled, the cell right-click menu shows a column listing each action’s keyboard shortcut. You can also toggle this at runtime from the menu itself ("Show/Hide Keybindings").'
   }
 ]
 
@@ -280,6 +287,28 @@ if (isInBrowser) {
           .lsp-mdt-menu-item.disabled {
             opacity: .4; cursor: default; pointer-events: none;
           }
+          /* "Hide Keybindings" (toggle on): a subtle persistent state, not
+             the full blue used for hover/press. Faint fill + a thin accent
+             bar; hovering it still gets the normal blue press feedback. */
+          .lsp-mdt-menu-item.active {
+            background: var(--ls-tertiary-background-color, rgba(127,127,127,.12));
+            box-shadow: inset 2px 0 0 0 var(--ls-active-primary-color, #2563eb);
+          }
+          .lsp-mdt-menu-item.active:hover {
+            background: var(--ls-active-primary-color, #2563eb);
+            color: #fff;
+          }
+          .lsp-mdt-menu-item.active .lsp-mdt-menu-icon { opacity: 1; }
+          .lsp-mdt-menu-label { flex: 1 1 auto; }
+          /* Right-hand keybinding column, shown while the toggle is on. */
+          .lsp-mdt-menu.lsp-mdt-menu-kb { min-width: 240px; }
+          .lsp-mdt-menu-kbd {
+            margin-left: auto; padding-left: 24px;
+            font-size: 11px; opacity: .55; letter-spacing: .02em;
+            font-family: var(--ls-font-family-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+          }
+          .lsp-mdt-menu-item:hover .lsp-mdt-menu-kbd,
+          .lsp-mdt-menu-item.active .lsp-mdt-menu-kbd { opacity: .85; }
           .lsp-mdt-menu-sep {
             height: 1px; margin: 4px 6px;
             background: var(--ls-border-color);
@@ -403,6 +432,8 @@ if (isInBrowser) {
                     debounceMs,
                     isPinned: () => logseq.settings?.toolbarPinned === true,
                     setPinned: (v) => { try { logseq.updateSettings({ toolbarPinned: !!v }) } catch (e) { /* noop */ } },
+                    isKeybindingsShown: () => logseq.settings?.menuShowKeybindings === true,
+                    setKeybindingsShown: (v) => { try { logseq.updateSettings({ menuShowKeybindings: !!v }) } catch (e) { /* noop */ } },
                     menuLabels: {
                       insertRowAbove: i18n.t('Insert row above'),
                       insertRowBelow: i18n.t('Insert row below'),
@@ -419,7 +450,9 @@ if (isInBrowser) {
                       pinToolbar: i18n.t('Pin toolbar'),
                       unpinToolbar: i18n.t('Unpin toolbar'),
                       maximise: i18n.t('Maximise'),
-                      exitMaximise: i18n.t('Exit maximise')
+                      exitMaximise: i18n.t('Exit maximise'),
+                      showKeybindings: i18n.t('Show Keybindings'),
+                      hideKeybindings: i18n.t('Hide Keybindings')
                     }
                   }
                   attachInlineEditing(el, inlineOpts)

@@ -18,5 +18,7 @@
   "Sort column ascending": "Sort column ascending",
   "Sort column descending": "Sort column descending",
   "Pin toolbar": "Pin toolbar",
-  "Unpin toolbar": "Unpin toolbar"
+  "Unpin toolbar": "Unpin toolbar",
+  "Show Keybindings": "Show Keybindings",
+  "Hide Keybindings": "Hide Keybindings"
 }

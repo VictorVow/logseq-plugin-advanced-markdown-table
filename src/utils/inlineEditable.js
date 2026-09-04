@@ -477,6 +477,8 @@ const ICONS = {
   sortColAsc:  SVG('<path d="M11 5h3M11 10h6M11 15h9"/><polyline points="4 8 7 5 10 8"/><line x1="7" y1="5" x2="7" y2="19"/>'),
   sortColDesc: SVG('<path d="M11 5h9M11 10h6M11 15h3"/><polyline points="4 16 7 19 10 16"/><line x1="7" y1="5" x2="7" y2="19"/>'),
   pin: SVG('<line x1="12" y1="17" x2="12" y2="22"/><path d="M9 3h6l-1 6 3 3v2H7v-2l3-3-1-6z"/>'),
+  // Keyboard outline: toggles the keybinding column in the right-click menu.
+  keybindings: SVG('<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h0M10 10h0M14 10h0M18 10h0M8 14h8"/>'),
   // Maximise = expand to Logseq's window bounds (covers sidebars/blocks).
   // A framed box with inward arrows; the exit variant has the arrows outward.
   maximise:     SVG('<rect x="3" y="3" width="18" height="18" rx="1"/><polyline points="8 13 8 16 11 16"/><polyline points="16 11 16 8 13 8"/>'),
@@ -516,7 +518,7 @@ const buildItems = (root, opts, cell) => {
     { icon: ICONS.moveRowDown, label: L.moveRowDown || 'Move row down', enabled: rowIdx >= 1 && rowIdx < rowCount - 1,
       shortcut: 'Alt+Shift+Down', run: m => tableOps.moveRowDown(m, rowIdx) },
     { icon: ICONS.deleteRow, label: L.deleteRow || 'Delete row', enabled: rowCount >= 2,
-      run: m => tableOps.deleteRow(m, rowIdx) },
+      shortcut: 'Ctrl+Backspace', run: m => tableOps.deleteRow(m, rowIdx) },
     { sep: true },
     { icon: ICONS.insertColLeft, label: L.insertColLeft || 'Insert column left', enabled: true,
       shortcut: 'Alt+Ctrl+Shift+Left', run: m => tableOps.insertColLeft(m, rowIdx, colIdx) },
@@ -527,7 +529,7 @@ const buildItems = (root, opts, cell) => {
     { icon: ICONS.moveColRight, label: L.moveColRight || 'Move column right', enabled: colIdx < colCount - 1,
       shortcut: 'Alt+Shift+Right', run: m => tableOps.moveColRight(m, rowIdx, colIdx) },
     { icon: ICONS.deleteCol, label: L.deleteCol || 'Delete column', enabled: colCount >= 2,
-      run: m => tableOps.deleteCol(m, rowIdx, colIdx) },
+      shortcut: 'Ctrl+Delete', run: m => tableOps.deleteCol(m, rowIdx, colIdx) },
     { sep: true },
     { icon: ICONS.sortColAsc, label: L.sortColAsc || 'Sort column ascending', enabled: rowCount >= 3,
       run: m => tableOps.sortColAsc(m, rowIdx, colIdx) },
@@ -607,6 +609,29 @@ const maximiseItem = (root, opts, after) => {
       else maximiseRenderer(root)
       if (after) after(!max)
     }
+  }
+}
+
+const isKeybindingsShown = (opts) => !!(opts.isKeybindingsShown && opts.isKeybindingsShown())
+
+// "Show/Hide Keybindings" toggle; lives between Maximise and Pin/Unpin in
+// the right-click menu. When on, the menu grows a right-hand column listing
+// each item's keybinding. Menu-only: the pinned toolbar is icon-only and
+// has no labels to align a column against.
+//
+// `on` is passed in (not read from opts) because logseq.updateSettings() is
+// async: right after a toggle, opts.isKeybindingsShown() still returns the
+// old value, so the in-place rebuild must be told the new state directly.
+// `toggle(nowShown)` persists the setting and rebuilds the menu.
+const keybindingsItem = (on, L, toggle) => {
+  L = L || {}
+  return {
+    icon: ICONS.keybindings,
+    label: on ? (L.hideKeybindings || 'Hide Keybindings')
+              : (L.showKeybindings || 'Show Keybindings'),
+    enabled: true,
+    active: on,
+    action: () => toggle(!on)
   }
 }
 
@@ -734,22 +759,34 @@ const buildToolbar = (root, opts, cell) => {
   positionToolbar(cell, bar)
 }
 
-const openContextMenu = (root, opts, cell, ev) => {
+const openContextMenu = (root, opts, cell, ev, kbShownOverride) => {
   const doc = root.ownerDocument
   const win = doc.defaultView || window
   closeMenu(doc)
 
+  // On first open, read the persisted setting; on an in-place rebuild after a
+  // toggle, use the value handed to us (logseq.settings hasn't caught up yet).
+  const showKb = kbShownOverride != null ? kbShownOverride : isKeybindingsShown(opts)
+
   const { items, ord } = buildItems(root, opts, cell)
+  // Rebuilding the menu in place (same anchor) lets the keybindings toggle
+  // redraw with/without the shortcut column without the user re-opening it.
+  const toggleKb = (now) => {
+    if (opts.setKeybindingsShown) opts.setKeybindingsShown(now)
+    openContextMenu(root, opts, cell, ev, now)
+  }
   const all = items.concat([{ sep: true },
     maximiseItem(root, opts),
+    keybindingsItem(showKb, opts.menuLabels, toggleKb),
     pinItem(opts, (now) => { if (now) buildToolbar(root, opts, cell); else removeToolbar(doc) })])
 
   const menu = doc.createElement('div')
-  menu.className = 'lsp-mdt-menu'
+  menu.className = 'lsp-mdt-menu' + (showKb ? ' lsp-mdt-menu-kb' : '')
   all.forEach(it => {
     if (it.sep) { const s = doc.createElement('div'); s.className = 'lsp-mdt-menu-sep'; menu.appendChild(s); return }
     const mi = doc.createElement('div')
-    mi.className = 'lsp-mdt-menu-item' + (it.enabled ? '' : ' disabled')
+    mi.className = 'lsp-mdt-menu-item' +
+      (it.enabled ? '' : ' disabled') + (it.active ? ' active' : '')
     // Native tooltip surfaces the keybind on hover for items that have
     // one. Reflects the hardcoded default in `attachInlineEditing`; an
     // extra shortcut the user assigned via Logseq's keymap UI would
@@ -759,9 +796,17 @@ const openContextMenu = (root, opts, cell, ev) => {
     ic.className = 'lsp-mdt-menu-icon'
     ic.innerHTML = it.icon || ''
     const lb = doc.createElement('span')
+    lb.className = 'lsp-mdt-menu-label'
     lb.textContent = it.label
     mi.appendChild(ic)
     mi.appendChild(lb)
+    // Right-hand keybinding column (only while the toggle is on).
+    if (showKb) {
+      const kb = doc.createElement('span')
+      kb.className = 'lsp-mdt-menu-kbd'
+      kb.textContent = it.shortcut || ''
+      mi.appendChild(kb)
+    }
     if (it.enabled) {
       mi.addEventListener('click', (e) => {
         e.preventDefault(); e.stopPropagation()
