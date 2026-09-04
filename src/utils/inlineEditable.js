@@ -7,10 +7,14 @@
 //
 // Two hazards are designed around here:
 //
-//  1. Caret jumps. Every updateBlock re-runs the block renderer. We never
-//     re-sync cell text from props; React reconciles the identical serialized
-//     text as a no-op, so the live contentEditable DOM (and caret) is left
-//     untouched. We also ignore the echo of our own write.
+//  1. Caret jumps. Every updateBlock re-runs the block renderer, which would
+//     rebuild the React tree and reconcile the cell text nodes -- resetting
+//     the caret to the start of the cell the user is typing in. A plain cell
+//     edit is already in the live contentEditable DOM, so we record the
+//     content we're about to write in `domSyncedContent`; the renderer
+//     (index.js) sees that echo and returns the *identical* element so React
+//     bails out of reconciliation entirely. Structural ops clear the entry so
+//     they still get a real re-render (needed to rebuild the table DOM).
 //
 //  2. Structural corruption. A literal `|` or stray `\r` typed into a cell
 //     would break re-parsing (the parser splits naively on `|`). Cells are
@@ -20,6 +24,10 @@
 
 const debounceTimers = new Map() // blockId -> timeout handle
 const lastWritten = new Map()    // blockId -> last content we wrote (echo guard)
+// blockId -> content whose change is already reflected in the live
+// contentEditable DOM (a plain cell-text edit). The block renderer consumes
+// this to skip the echo re-render that would otherwise reset the caret.
+export const domSyncedContent = new Map()
 // blockId -> {ord,rowIdx,colIdx}: re-anchor the pinned toolbar to this
 // position after a toolbar action causes the block to re-render.
 const pendingToolbar = new Map()
@@ -356,7 +364,10 @@ const scheduleSave = (root, { segments, blockId, updateBlock, debounceMs }) => {
   clearTimeout(debounceTimers.get(blockId))
   debounceTimers.set(blockId, setTimeout(() => {
     debounceTimers.delete(blockId)
-    writeContent(blockId, buildContent(root, segments), updateBlock)
+    const content = buildContent(root, segments)
+    // The DOM already shows this text; tell the renderer to skip its echo.
+    domSyncedContent.set(blockId, content)
+    writeContent(blockId, content, updateBlock)
   }, debounceMs))
 }
 
@@ -365,6 +376,8 @@ const scheduleSave = (root, { segments, blockId, updateBlock, debounceMs }) => {
 const commitStructural = (root, { segments, blockId, updateBlock }, transform) => {
   clearTimeout(debounceTimers.get(blockId))
   debounceTimers.delete(blockId)
+  // A structural change reshapes the table; force the real re-render.
+  domSyncedContent.delete(blockId)
   writeContent(blockId, buildContent(root, segments, transform), updateBlock)
 }
 
@@ -1142,4 +1155,5 @@ export const resumePinnedToolbar = (root, opts) => {
 export const cancelInlineEditing = (blockId) => {
   clearTimeout(debounceTimers.get(blockId))
   debounceTimers.delete(blockId)
+  domSyncedContent.delete(blockId)
 }

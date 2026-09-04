@@ -3,7 +3,7 @@ import '@logseq/libs'
 import parseMarkdownTable from './utils/parseRawInputByMarkdownIt'
 import { splitStrByTable } from './utils/splitStrByTable'
 import { looksLikeMarkdownTable, markdownTableToMatrix } from './utils/detectMarkdownTable'
-import { attachInlineEditing, deleteInFocusedTableCell, insertInFocusedTableCell, moveCaretInFocusedTableCell, moveInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
+import { attachInlineEditing, deleteInFocusedTableCell, domSyncedContent, insertInFocusedTableCell, moveCaretInFocusedTableCell, moveInFocusedTableCell, prepareInlineRenderer, resumePinnedToolbar } from './utils/inlineEditable'
 import i18n from './locales/i18n'
 import './index.css'
 
@@ -336,6 +336,18 @@ if (isInBrowser) {
           }
         `)
 
+        // blockId -> { content, element }: the last tree render() returned.
+        // A plain cell edit is typed straight into the live contentEditable
+        // DOM, then auto-saved; Logseq answers that save by re-invoking
+        // render() with the new content. Rebuilding the tree there makes React
+        // reconcile the cell text and reset the caret to the start of the
+        // cell. When the change is that echo (see `domSyncedContent`), or the
+        // content is unchanged, we return the *identical* element reference so
+        // React bails out of reconciliation and the caret is left where the
+        // user is typing. Structural ops clear `domSyncedContent`, so they
+        // still get a real re-render (needed to rebuild the table DOM).
+        const lastRender = new Map()
+
         logseq.Experiments.registerBlockRenderer('markdown-table-view', {
           includeChildren: false,
           priority: 10,
@@ -346,6 +358,10 @@ if (isInBrowser) {
             const React = logseq.Experiments.React
             const id = uuid || blockId
             const src = content || ''
+            const prev = lastRender.get(id)
+            const isEcho = domSyncedContent.get(id) === src
+            domSyncedContent.delete(id)
+            if (prev && (prev.content === src || isEcho)) return prev.element
             const segments = splitStrByTable(src, parseMarkdownTable(src))
             const children = segments.map((seg, si) => {
               if (seg.type !== 'table') {
@@ -373,7 +389,7 @@ if (isInBrowser) {
             })
             const dbRaw = Number(logseq.settings?.inlineEditDebounceMs)
             const debounceMs = Number.isFinite(dbRaw) && dbRaw >= 0 ? dbRaw : 500
-            return React.createElement('div',
+            const element = React.createElement('div',
               {
                 className: 'lsp-mdtable-renderer',
                 'data-blockid': String(id),
@@ -410,6 +426,8 @@ if (isInBrowser) {
                   resumePinnedToolbar(el, inlineOpts)
                 }
               }, children)
+            lastRender.set(id, { content: src, element })
+            return element
           }
         })
       }
